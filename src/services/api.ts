@@ -184,6 +184,10 @@ class ApiService {
     });
   }
 
+  async getUsers(): Promise<any[]> {
+    return this.fetchApi('/auth/users');
+  }
+
   // Tickets
   async getTickets(filters?: { status?: string; priority?: string; category?: string }): Promise<any[]> {
     const params = new URLSearchParams(filters as Record<string, string>);
