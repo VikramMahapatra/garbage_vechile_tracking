@@ -160,6 +160,114 @@ class ApiService {
     const params = new URLSearchParams(filters as Record<string, string>);
     return this.fetchApi(`/pickup-points/?${params.toString()}`);
   }
+
+  // Authentication
+  async login(email: string, password: string): Promise<any> {
+    return this.fetchApi('/auth/login-json', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async register(userData: { email: string; password: string; name: string; role?: string }): Promise<any> {
+    return this.fetchApi('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async getCurrentUser(token: string): Promise<any> {
+    return this.fetchApi('/auth/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  // Tickets
+  async getTickets(filters?: { status?: string; priority?: string; category?: string }): Promise<any[]> {
+    const params = new URLSearchParams(filters as Record<string, string>);
+    return this.fetchApi(`/tickets/?${params.toString()}`);
+  }
+
+  async getTicket(ticketId: string): Promise<any> {
+    return this.fetchApi(`/tickets/${ticketId}`);
+  }
+
+  async createTicket(ticketData: any): Promise<any> {
+    return this.fetchApi('/tickets/', {
+      method: 'POST',
+      body: JSON.stringify(ticketData),
+    });
+  }
+
+  async updateTicket(ticketId: string, ticketData: any): Promise<any> {
+    return this.fetchApi(`/tickets/${ticketId}`, {
+      method: 'PUT',
+      body: JSON.stringify(ticketData),
+    });
+  }
+
+  async getTicketComments(ticketId: string): Promise<any[]> {
+    return this.fetchApi(`/tickets/${ticketId}/comments`);
+  }
+
+  async addTicketComment(ticketId: string, comment: string, token: string): Promise<any> {
+    return this.fetchApi(`/tickets/${ticketId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ comment, is_internal: false }),
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  async getTicketStatistics(): Promise<any> {
+    return this.fetchApi('/tickets/statistics/summary');
+  }
+
+  // Twitter/Social Media
+  async getTwitterMentions(filters?: { sentiment?: string; category?: string }): Promise<any[]> {
+    const params = new URLSearchParams(filters as Record<string, string>);
+    return this.fetchApi(`/social-media/twitter-mentions?${params.toString()}`);
+  }
+
+  async getTwitterStatistics(): Promise<any> {
+    return this.fetchApi('/social-media/twitter-mentions/statistics/summary');
+  }
+
+  async respondToTwitterMention(mentionId: string, responseText: string): Promise<any> {
+    return this.fetchApi(`/social-media/twitter-mentions/${mentionId}/respond`, {
+      method: 'PUT',
+      body: JSON.stringify({ response_text: responseText }),
+    });
+  }
+
+  // Analytics
+  async getAnalytics(filters?: { metric_type?: string; zone_id?: string }): Promise<any[]> {
+    const params = new URLSearchParams(filters as Record<string, string>);
+    return this.fetchApi(`/analytics/?${params.toString()}`);
+  }
+
+  async getPerformanceOverview(): Promise<any> {
+    return this.fetchApi('/analytics/performance/overview');
+  }
+
+  async getZoneWisePerformance(): Promise<any[]> {
+    return this.fetchApi('/analytics/performance/zone-wise');
+  }
+
+  async getVendorWisePerformance(): Promise<any[]> {
+    return this.fetchApi('/analytics/performance/vendor-wise');
+  }
+
+  async getMaintenancePredictions(): Promise<any[]> {
+    return this.fetchApi('/analytics/predictions/maintenance');
+  }
+
+  async getCollectionRateTrends(): Promise<any[]> {
+    return this.fetchApi('/analytics/trends/collection-rate');
+  }
 }
 
 export const apiService = new ApiService();

@@ -213,3 +213,124 @@ class TruckWithDetails(Truck):
     route_name: Optional[str] = None
     zone_name: Optional[str] = None
     ward_name: Optional[str] = None
+
+# User Schemas
+class UserBase(BaseModel):
+    email: str
+    name: str
+    role: str = "user"
+    is_active: bool = True
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class User(UserBase):
+    id: str
+    created_at: datetime
+    last_login: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: User
+
+# Ticket Schemas
+class TicketBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    category: str
+    priority: str = "medium"
+    status: str = "open"
+    reporter_name: Optional[str] = None
+    reporter_phone: Optional[str] = None
+    reporter_email: Optional[str] = None
+    location: Optional[str] = None
+    zone_id: Optional[str] = None
+    ward_id: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
+
+class TicketCreate(TicketBase):
+    pass
+
+class Ticket(TicketBase):
+    id: str
+    ticket_number: str
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: Optional[datetime] = None
+    sla_breached: bool = False
+    
+    class Config:
+        from_attributes = True
+
+class TicketCommentBase(BaseModel):
+    comment: str
+    is_internal: bool = False
+
+class TicketCommentCreate(TicketCommentBase):
+    ticket_id: str
+    user_id: str
+
+class TicketComment(TicketCommentBase):
+    id: int
+    ticket_id: str
+    user_id: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Twitter Mention Schemas
+class TwitterMentionBase(BaseModel):
+    tweet_id: str
+    author: str
+    author_name: str
+    content: str
+    timestamp: datetime
+    likes: int = 0
+    retweets: int = 0
+    replies: int = 0
+    sentiment: Optional[str] = None
+    category: Optional[str] = None
+    location: Optional[str] = None
+
+class TwitterMentionCreate(TwitterMentionBase):
+    pass
+
+class TwitterMention(TwitterMentionBase):
+    id: str
+    is_responded: bool = False
+    response_text: Optional[str] = None
+    response_at: Optional[datetime] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Analytics Schemas
+class AnalyticsBase(BaseModel):
+    date: datetime
+    metric_name: str
+    metric_value: float
+    metric_type: str
+    zone_id: Optional[str] = None
+    vendor_id: Optional[str] = None
+    additional_data: Optional[str] = None
+
+class AnalyticsCreate(AnalyticsBase):
+    pass
+
+class Analytics(AnalyticsBase):
+    id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

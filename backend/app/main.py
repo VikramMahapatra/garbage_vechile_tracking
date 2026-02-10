@@ -109,6 +109,15 @@ app.include_router(pickup_points.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 
+# Import new routers
+from .routers import auth, tickets, social_media, analytics
+
+# Include new routers
+app.include_router(auth.router, prefix="/api")
+app.include_router(tickets.router, prefix="/api")
+app.include_router(social_media.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
+
 # WebSocket endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

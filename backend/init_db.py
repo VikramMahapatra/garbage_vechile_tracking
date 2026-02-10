@@ -17,6 +17,11 @@ def init_database():
     
     try:
         # Clear existing data
+        db.query(models.Analytics).delete()
+        db.query(models.TwitterMention).delete()
+        db.query(models.TicketComment).delete()
+        db.query(models.Ticket).delete()
+        db.query(models.User).delete()
         db.query(models.Alert).delete()
         db.query(models.PickupPoint).delete()
         db.query(models.Truck).delete()
@@ -374,6 +379,139 @@ def init_database():
         db.commit()
         print(f"✅ Created {len(alerts_data)} alerts")
         
+        # Create sample users (with pre-hashed passwords for demo)
+        # In production, use proper bcrypt hashing
+        users_data = [
+            models.User(
+                id="user-1",
+                email="admin@city.gov",
+                name="Admin User",
+                hashed_password="$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyWpQvGZbN4m",  # admin123
+                role="admin",
+                is_active=True
+            ),
+            models.User(
+                id="user-2",
+                email="operator@city.gov",
+                name="System Operator",
+                hashed_password="$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyWpQvGZbN4m",  # operator123
+                role="user",
+                is_active=True
+            ),
+        ]
+        db.add_all(users_data)
+        db.commit()
+        print(f"✅ Created {len(users_data)} users")
+        
+        # Create sample tickets
+        from datetime import datetime, timedelta
+        tickets_data = [
+            models.Ticket(
+                id="ticket-1",
+                ticket_number="TKT-000001",
+                title="Garbage not collected in Kharadi Sector 5",
+                description="Residents reporting that garbage has not been collected for 2 days",
+                category="complaint",
+                priority="high",
+                status="open",
+                reporter_name="Ramesh Kumar",
+                reporter_phone="+91 9876543210",
+                reporter_email="ramesh@example.com",
+                location="Kharadi, Sector 5",
+                zone_id="ZN003",
+                ward_id="WD006",
+                due_date=datetime.utcnow() + timedelta(hours=24)
+            ),
+            models.Ticket(
+                id="ticket-2",
+                ticket_number="TKT-000002",
+                title="Request for additional bin in Aundh",
+                description="Need additional garbage bin near society entrance",
+                category="request",
+                priority="medium",
+                status="in_progress",
+                reporter_name="Priya Singh",
+                reporter_phone="+91 9876543211",
+                reporter_email="priya@example.com",
+                location="Aundh, DP Road",
+                zone_id="ZN001",
+                ward_id="WD001",
+                assigned_to="user-1"
+            ),
+            models.Ticket(
+                id="ticket-3",
+                ticket_number="TKT-000003",
+                title="Excellent service by collection team",
+                description="Timely collection and courteous staff",
+                category="feedback",
+                priority="low",
+                status="resolved",
+                reporter_name="Suresh Patil",
+                reporter_email="suresh@example.com",
+                location="Baner",
+                zone_id="ZN001",
+                ward_id="WD002",
+                resolved_at=datetime.utcnow()
+            ),
+        ]
+        db.add_all(tickets_data)
+        db.commit()
+        print(f"✅ Created {len(tickets_data)} tickets")
+        
+        # Create sample Twitter mentions
+        twitter_data = [
+            models.TwitterMention(
+                id="mention-1",
+                tweet_id="1234567890",
+                author="@citizen_pune",
+                author_name="Pune Citizen",
+                content="@MunicipalGC Garbage truck hasn't arrived in Kharadi sector 5 for 2 days now. Please look into this urgently!",
+                timestamp=datetime.utcnow() - timedelta(hours=2),
+                likes=45,
+                retweets=12,
+                replies=8,
+                sentiment="negative",
+                category="complaint",
+                location="Kharadi, Sector 5",
+                is_responded=False
+            ),
+            models.TwitterMention(
+                id="mention-2",
+                tweet_id="1234567891",
+                author="@green_warrior",
+                author_name="Green Warrior",
+                content="@MunicipalGC Thank you for the quick response yesterday! The new collection schedule is working great in our area.",
+                timestamp=datetime.utcnow() - timedelta(hours=4),
+                likes=89,
+                retweets=23,
+                replies=5,
+                sentiment="positive",
+                category="appreciation",
+                location="Aundh",
+                is_responded=True,
+                response_text="Thank you for your feedback! We're glad the new schedule is working well.",
+                response_at=datetime.utcnow() - timedelta(hours=3)
+            ),
+            models.TwitterMention(
+                id="mention-3",
+                tweet_id="1234567892",
+                author="@eco_pune",
+                author_name="Eco Pune",
+                content="@MunicipalGC What is the process for scheduling bulk waste pickup in Baner area?",
+                timestamp=datetime.utcnow() - timedelta(hours=1),
+                likes=15,
+                retweets=3,
+                replies=2,
+                sentiment="neutral",
+                category="query",
+                location="Baner",
+                is_responded=False
+            ),
+        ]
+        db.add_all(twitter_data)
+        db.commit()
+        print(f"✅ Created {len(twitter_data)} twitter mentions")
+        
         print("\n🎉 Database initialization completed successfully!")
         print(f"📊 Summary:")
         print(f"   - Zones: {len(zones_data)}")
@@ -384,6 +522,12 @@ def init_database():
         print(f"   - Trucks: {len(trucks_data)}")
         print(f"   - Pickup Points: {len(pickup_points_data)}")
         print(f"   - Alerts: {len(alerts_data)}")
+        print(f"   - Users: {len(users_data)}")
+        print(f"   - Tickets: {len(tickets_data)}")
+        print(f"   - Twitter Mentions: {len(twitter_data)}")
+        print(f"\n👤 Login Credentials:")
+        print(f"   Admin: admin@city.gov / admin123")
+        print(f"   Operator: operator@city.gov / operator123")
         
     except Exception as e:
         print(f"❌ Error initializing database: {e}")

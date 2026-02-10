@@ -175,3 +175,81 @@ class Alert(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="active")
     resolved_at = Column(DateTime, nullable=True)
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    role = Column(String, default="user")  # admin or user
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+    
+    id = Column(String, primary_key=True)
+    ticket_number = Column(String, unique=True, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    description = Column(String)
+    category = Column(String)  # complaint, request, feedback, query
+    priority = Column(String, default="medium")  # low, medium, high, critical
+    status = Column(String, default="open")  # open, in_progress, pending, resolved, closed
+    reporter_name = Column(String)
+    reporter_phone = Column(String)
+    reporter_email = Column(String)
+    location = Column(String)
+    zone_id = Column(String, ForeignKey("zones.id"), nullable=True)
+    ward_id = Column(String, ForeignKey("wards.id"), nullable=True)
+    assigned_to = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    due_date = Column(DateTime, nullable=True)
+    sla_breached = Column(Boolean, default=False)
+
+class TicketComment(Base):
+    __tablename__ = "ticket_comments"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticket_id = Column(String, ForeignKey("tickets.id"))
+    user_id = Column(String, ForeignKey("users.id"))
+    comment = Column(String, nullable=False)
+    is_internal = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class TwitterMention(Base):
+    __tablename__ = "twitter_mentions"
+    
+    id = Column(String, primary_key=True)
+    tweet_id = Column(String, unique=True, nullable=False)
+    author = Column(String)
+    author_name = Column(String)
+    content = Column(String, nullable=False)
+    timestamp = Column(DateTime)
+    likes = Column(Integer, default=0)
+    retweets = Column(Integer, default=0)
+    replies = Column(Integer, default=0)
+    sentiment = Column(String)  # positive, negative, neutral
+    category = Column(String)  # complaint, appreciation, query, suggestion
+    location = Column(String, nullable=True)
+    is_responded = Column(Boolean, default=False)
+    response_text = Column(String, nullable=True)
+    response_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Analytics(Base):
+    __tablename__ = "analytics"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(DateTime, nullable=False)
+    metric_name = Column(String, nullable=False)
+    metric_value = Column(Float, nullable=False)
+    metric_type = Column(String)  # performance, efficiency, compliance, prediction
+    zone_id = Column(String, ForeignKey("zones.id"), nullable=True)
+    vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
+    additional_data = Column(String, nullable=True)  # JSON string for additional data
+    created_at = Column(DateTime, default=datetime.utcnow)
