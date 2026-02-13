@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -169,10 +169,15 @@ class Alert(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     truck_id = Column(String, ForeignKey("trucks.id"))
+    route_id = Column(String, ForeignKey("routes.id"), nullable=True)
+    zone_id = Column(String, ForeignKey("zones.id"), nullable=True)
+    ward_id = Column(String, ForeignKey("wards.id"), nullable=True)
     alert_type = Column(String)
     severity = Column(String)
     message = Column(String)
+    location = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    date = Column(String, nullable=True)
     status = Column(String, default="active")
     resolved_at = Column(DateTime, nullable=True)
 
@@ -253,3 +258,28 @@ class Analytics(Base):
     vendor_id = Column(String, ForeignKey("vendors.id"), nullable=True)
     additional_data = Column(String, nullable=True)  # JSON string for additional data
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class ReportData(Base):
+    __tablename__ = "report_data"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report_type = Column(String, nullable=False, unique=True)
+    payload = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class GtcCheckpointEntry(Base):
+    __tablename__ = "gtc_checkpoint_entries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    truck_id = Column(String, ForeignKey("trucks.id"), nullable=False, index=True)
+    arrived_at = Column(DateTime, default=datetime.utcnow, index=True)
+    is_dry = Column(Boolean, default=False)
+    is_wet = Column(Boolean, default=False)
+    is_metal = Column(Boolean, default=False)
+    is_plastic = Column(Boolean, default=False)
+    is_sanitary = Column(Boolean, default=False)
+    truck_cleanliness_score = Column(Integer, nullable=True)
+    gtc_cleanliness_score = Column(Integer, nullable=True)
+    remarks = Column(String, nullable=True)
+
+    truck = relationship("Truck")

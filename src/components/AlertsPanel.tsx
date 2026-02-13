@@ -105,14 +105,14 @@ const AlertsPanel = () => {
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-2">
+        <div className="p-4 space-y-3">
           {displayedAlerts.map((alert) => {
             const Icon = getAlertIcon(alert.type);
             const styles = getSeverityStyles(alert.severity);
             return (
               <div
                 key={alert.id}
-                className={`p-3 rounded-lg border-l-4 ${styles.border} ${styles.bg} border border-border transition-all hover:shadow-sm`}
+                className={`p-4 rounded-lg border-l-4 ${styles.border} ${styles.bg} border border-border transition-all hover:shadow-sm`}
               >
                 <div className="flex gap-3">
                   <div className={`h-8 w-8 rounded-lg ${styles.icon} flex items-center justify-center shrink-0`}>

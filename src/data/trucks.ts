@@ -48,7 +48,7 @@ export interface TruckLive {
   route: string;
   routeId: string;
   speed: number;
-  assignedGCP?: string;
+  assignedGTP?: string;
   assignedDumpingSite?: string;
   tripsCompleted: number;
   tripsAllowed: number;
@@ -307,7 +307,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Kharadi Primary Route 1',
     routeId: 'RT001',
     speed: 25,
-    assignedGCP: 'GCP-001',
+    assignedGTP: 'GTP-001',
     tripsCompleted: 3,
     tripsAllowed: 5,
     vehicleCapacity: '8 tons',
@@ -335,7 +335,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Kharadi Secondary Route 1',
     routeId: 'RT002',
     speed: 0,
-    assignedGCP: 'GCP-001',
+    assignedGTP: 'GTP-001',
     assignedDumpingSite: 'FDS-001',
     tripsCompleted: 2,
     tripsAllowed: 4,
@@ -364,7 +364,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Viman Nagar Primary Route 1',
     routeId: 'RT003',
     speed: 0,
-    assignedGCP: 'GCP-002',
+    assignedGTP: 'GTP-002',
     tripsCompleted: 4,
     tripsAllowed: 5,
     vehicleCapacity: '8 tons',
@@ -392,7 +392,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Viman Nagar Secondary Route 1',
     routeId: 'RT004',
     speed: 0,
-    assignedGCP: 'GCP-002',
+    assignedGTP: 'GTP-002',
     assignedDumpingSite: 'FDS-001',
     tripsCompleted: 1,
     tripsAllowed: 3,
@@ -423,7 +423,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Aundh Primary Route 1',
     routeId: 'RT005',
     speed: 30,
-    assignedGCP: 'GCP-003',
+    assignedGTP: 'GTP-003',
     tripsCompleted: 2,
     tripsAllowed: 5,
     vehicleCapacity: '10 tons',
@@ -451,7 +451,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Baner Primary Route 1',
     routeId: 'RT006',
     speed: 22,
-    assignedGCP: 'GCP-003',
+    assignedGTP: 'GTP-003',
     tripsCompleted: 3,
     tripsAllowed: 5,
     vehicleCapacity: '5 tons',
@@ -479,7 +479,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Aundh Secondary Route 1',
     routeId: 'RT007',
     speed: 18,
-    assignedGCP: 'GCP-003',
+    assignedGTP: 'GTP-003',
     assignedDumpingSite: 'FDS-002',
     tripsCompleted: 2,
     tripsAllowed: 4,
@@ -508,7 +508,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Hadapsar Primary Route 1',
     routeId: 'RT008',
     speed: 28,
-    assignedGCP: 'GCP-004',
+    assignedGTP: 'GTP-004',
     tripsCompleted: 2,
     tripsAllowed: 5,
     vehicleCapacity: '8 tons',
@@ -536,7 +536,7 @@ export const trucksLive: TruckLive[] = [
     route: 'Hadapsar Secondary Route 1',
     routeId: 'RT009',
     speed: 0,
-    assignedGCP: 'GCP-004',
+    assignedGTP: 'GTP-004',
     assignedDumpingSite: 'FDS-001',
     tripsCompleted: 3,
     tripsAllowed: 4,

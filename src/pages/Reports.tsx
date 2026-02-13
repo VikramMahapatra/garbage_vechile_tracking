@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { PageHeader } from "@/components/PageHeader";
 import { 
   Download, 
   FileText, 
@@ -55,210 +56,72 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { mockTrucks, mockDrivers } from "@/data/masterData";
+import { useTrucks, useDrivers, useReportsData } from "@/hooks/useDataQueries";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 
-// Mock data for reports
-const dailyPickupCoverageData = [
-  { id: 1, date: "2024-01-15", ward: "Kharadi East", zone: "Zone A", truck: "MH-12-AB-1234", driver: "Rajesh Kumar", totalPoints: 45, covered: 43, missed: 2, weight: 2.4, status: "completed" },
-  { id: 2, date: "2024-01-15", ward: "Kharadi West", zone: "Zone A", truck: "MH-12-CD-5678", driver: "Amit Singh", totalPoints: 52, covered: 52, missed: 0, weight: 2.8, status: "completed" },
-  { id: 3, date: "2024-01-15", ward: "Viman Nagar", zone: "Zone B", truck: "MH-12-EF-9012", driver: "Suresh Patil", totalPoints: 38, covered: 35, missed: 3, weight: 1.9, status: "partial" },
-  { id: 4, date: "2024-01-15", ward: "Kalyani Nagar", zone: "Zone B", truck: "MH-12-GH-3456", driver: "Mahesh Yadav", totalPoints: 41, covered: 41, missed: 0, weight: 2.2, status: "completed" },
-  { id: 5, date: "2024-01-15", ward: "Wadgaon Sheri", zone: "Zone C", truck: "MH-12-IJ-7890", driver: "Ravi Sharma", totalPoints: 35, covered: 30, missed: 5, weight: 1.6, status: "partial" },
-  { id: 6, date: "2024-01-14", ward: "Hadapsar", zone: "Zone C", truck: "MH-12-KL-1122", driver: "Manoj Patil", totalPoints: 48, covered: 47, missed: 1, weight: 2.5, status: "completed" },
-  { id: 7, date: "2024-01-14", ward: "Magarpatta", zone: "Zone D", truck: "MH-12-MN-3344", driver: "Ravi Deshmukh", totalPoints: 55, covered: 50, missed: 5, weight: 2.7, status: "partial" },
-  { id: 8, date: "2024-01-14", ward: "Koregaon Park", zone: "Zone A", truck: "MH-12-OP-5566", driver: "Sunil Yadav", totalPoints: 42, covered: 42, missed: 0, weight: 2.3, status: "completed" },
-  { id: 9, date: "2024-01-14", ward: "Mundhwa", zone: "Zone B", truck: "MH-12-QR-7788", driver: "Anil Sharma", totalPoints: 39, covered: 37, missed: 2, weight: 2.0, status: "completed" },
-  { id: 10, date: "2024-01-14", ward: "Keshav Nagar", zone: "Zone C", truck: "MH-12-ST-9900", driver: "Deepak Jadhav", totalPoints: 44, covered: 40, missed: 4, weight: 2.1, status: "partial" },
-  { id: 11, date: "2024-01-13", ward: "Wagholi", zone: "Zone D", truck: "MH-12-UV-1212", driver: "Vikram Singh", totalPoints: 50, covered: 50, missed: 0, weight: 2.6, status: "completed" },
-  { id: 12, date: "2024-01-13", ward: "Lohegaon", zone: "Zone A", truck: "MH-12-WX-3434", driver: "Prakash Rane", totalPoints: 36, covered: 34, missed: 2, weight: 1.8, status: "completed" },
-];
-
-const routePerformanceData = [
-  { route: "Route A1", completion: 98, avgTime: "4.2 hrs", deviations: 2, efficiency: 96 },
-  { route: "Route A2", completion: 95, avgTime: "3.8 hrs", deviations: 5, efficiency: 91 },
-  { route: "Route B1", completion: 100, avgTime: "4.5 hrs", deviations: 0, efficiency: 99 },
-  { route: "Route B2", completion: 88, avgTime: "5.1 hrs", deviations: 8, efficiency: 82 },
-  { route: "Route C1", completion: 92, avgTime: "4.0 hrs", deviations: 4, efficiency: 88 },
-  { route: "Route C2", completion: 97, avgTime: "3.9 hrs", deviations: 1, efficiency: 95 },
-  { route: "Route D1", completion: 85, avgTime: "5.5 hrs", deviations: 10, efficiency: 75 },
-  { route: "Route D2", completion: 94, avgTime: "4.1 hrs", deviations: 3, efficiency: 90 },
-  { route: "Route E1", completion: 99, avgTime: "3.7 hrs", deviations: 1, efficiency: 98 },
-  { route: "Route E2", completion: 91, avgTime: "4.4 hrs", deviations: 6, efficiency: 85 },
-  { route: "Route F1", completion: 96, avgTime: "4.0 hrs", deviations: 2, efficiency: 93 },
-  { route: "Route F2", completion: 89, avgTime: "4.8 hrs", deviations: 7, efficiency: 80 },
-];
-
-const truckUtilizationData = [
-  { truck: "MH-12-AB-1234", type: "Compactor", trips: 3, operatingHours: 8.5, idleTime: 1.2, distance: 45, utilization: 92 },
-  { truck: "MH-12-CD-5678", type: "Mini Truck", trips: 4, operatingHours: 9.0, idleTime: 0.8, distance: 52, utilization: 95 },
-  { truck: "MH-12-EF-9012", type: "Dumper", trips: 2, operatingHours: 7.2, idleTime: 2.1, distance: 38, utilization: 78 },
-  { truck: "MH-12-GH-3456", type: "Open Truck", trips: 3, operatingHours: 8.0, idleTime: 1.5, distance: 41, utilization: 85 },
-  { truck: "MH-12-IJ-7890", type: "Compactor", trips: 3, operatingHours: 8.8, idleTime: 0.5, distance: 48, utilization: 96 },
-  { truck: "MH-12-KL-1122", type: "Mini Truck", trips: 5, operatingHours: 9.5, idleTime: 0.3, distance: 58, utilization: 98 },
-  { truck: "MH-12-MN-3344", type: "Dumper", trips: 2, operatingHours: 6.5, idleTime: 2.5, distance: 32, utilization: 72 },
-  { truck: "MH-12-OP-5566", type: "Compactor", trips: 4, operatingHours: 8.2, idleTime: 1.0, distance: 50, utilization: 91 },
-  { truck: "MH-12-QR-7788", type: "Open Truck", trips: 3, operatingHours: 7.8, idleTime: 1.8, distance: 42, utilization: 82 },
-  { truck: "MH-12-ST-9900", type: "Mini Truck", trips: 4, operatingHours: 8.6, idleTime: 0.9, distance: 54, utilization: 93 },
-  { truck: "MH-12-UV-1212", type: "Compactor", trips: 3, operatingHours: 7.5, idleTime: 1.6, distance: 40, utilization: 83 },
-  { truck: "MH-12-WX-3434", type: "Dumper", trips: 2, operatingHours: 6.8, idleTime: 2.3, distance: 35, utilization: 75 },
-];
-
-const fuelConsumptionData = [
-  { truck: "MH-12-AB-1234", fuelUsed: 18.5, distance: 45, efficiency: 2.43, cost: 1850, anomaly: false, score: 92 },
-  { truck: "MH-12-CD-5678", fuelUsed: 22.0, distance: 52, efficiency: 2.36, cost: 2200, anomaly: false, score: 95 },
-  { truck: "MH-12-EF-9012", fuelUsed: 28.5, distance: 38, efficiency: 1.33, cost: 2850, anomaly: true, score: 45 },
-  { truck: "MH-12-GH-3456", fuelUsed: 16.8, distance: 41, efficiency: 2.44, cost: 1680, anomaly: false, score: 94 },
-  { truck: "MH-12-IJ-7890", fuelUsed: 19.2, distance: 48, efficiency: 2.50, cost: 1920, anomaly: false, score: 97 },
-  { truck: "MH-12-KL-1122", fuelUsed: 20.5, distance: 58, efficiency: 2.83, cost: 2050, anomaly: false, score: 99 },
-  { truck: "MH-12-MN-3344", fuelUsed: 25.0, distance: 32, efficiency: 1.28, cost: 2500, anomaly: true, score: 40 },
-  { truck: "MH-12-OP-5566", fuelUsed: 19.8, distance: 50, efficiency: 2.53, cost: 1980, anomaly: false, score: 96 },
-  { truck: "MH-12-QR-7788", fuelUsed: 17.5, distance: 42, efficiency: 2.40, cost: 1750, anomaly: false, score: 93 },
-  { truck: "MH-12-ST-9900", fuelUsed: 21.2, distance: 54, efficiency: 2.55, cost: 2120, anomaly: false, score: 95 },
-  { truck: "MH-12-UV-1212", fuelUsed: 18.0, distance: 40, efficiency: 2.22, cost: 1800, anomaly: false, score: 88 },
-  { truck: "MH-12-WX-3434", fuelUsed: 26.5, distance: 35, efficiency: 1.32, cost: 2650, anomaly: true, score: 42 },
-];
-
-const driverAttendanceData = [
-  { driver: "Rajesh Kumar", id: "DRV001", shiftStart: "06:00", shiftEnd: "14:30", hoursWorked: 8.5, routes: 2, onTime: true, violations: 0, score: 95 },
-  { driver: "Amit Singh", id: "DRV002", shiftStart: "06:15", shiftEnd: "15:00", hoursWorked: 8.75, routes: 2, onTime: true, violations: 1, score: 88 },
-  { driver: "Suresh Patil", id: "DRV003", shiftStart: "06:45", shiftEnd: "14:00", hoursWorked: 7.25, routes: 1, onTime: false, violations: 2, score: 72 },
-  { driver: "Mahesh Yadav", id: "DRV004", shiftStart: "06:00", shiftEnd: "14:15", hoursWorked: 8.25, routes: 2, onTime: true, violations: 0, score: 98 },
-  { driver: "Ravi Sharma", id: "DRV005", shiftStart: "06:30", shiftEnd: "14:45", hoursWorked: 8.25, routes: 2, onTime: false, violations: 1, score: 82 },
-  { driver: "Manoj Patil", id: "DRV006", shiftStart: "06:00", shiftEnd: "14:00", hoursWorked: 8.0, routes: 2, onTime: true, violations: 0, score: 92 },
-  { driver: "Ravi Deshmukh", id: "DRV007", shiftStart: "06:20", shiftEnd: "14:40", hoursWorked: 8.33, routes: 2, onTime: false, violations: 1, score: 85 },
-  { driver: "Sunil Yadav", id: "DRV008", shiftStart: "06:00", shiftEnd: "14:30", hoursWorked: 8.5, routes: 2, onTime: true, violations: 0, score: 96 },
-  { driver: "Anil Sharma", id: "DRV009", shiftStart: "06:10", shiftEnd: "14:20", hoursWorked: 8.17, routes: 2, onTime: true, violations: 0, score: 94 },
-  { driver: "Deepak Jadhav", id: "DRV010", shiftStart: "07:00", shiftEnd: "15:00", hoursWorked: 8.0, routes: 1, onTime: false, violations: 3, score: 68 },
-  { driver: "Vikram Singh", id: "DRV011", shiftStart: "06:05", shiftEnd: "14:35", hoursWorked: 8.5, routes: 2, onTime: true, violations: 1, score: 90 },
-  { driver: "Prakash Rane", id: "DRV012", shiftStart: "06:00", shiftEnd: "14:00", hoursWorked: 8.0, routes: 2, onTime: true, violations: 0, score: 97 },
-];
-
-const complaintsData = [
-  { id: "CMP001", date: "2024-01-15", ward: "Kharadi East", type: "Missed Pickup", status: "resolved", truck: "MH-12-AB-1234", responseTime: "2 hrs" },
-  { id: "CMP002", date: "2024-01-15", ward: "Viman Nagar", type: "Irregular Timing", status: "pending", truck: "MH-12-EF-9012", responseTime: "-" },
-  { id: "CMP003", date: "2024-01-14", ward: "Kalyani Nagar", type: "Irregular Timing", status: "resolved", truck: "MH-12-GH-3456", responseTime: "4 hrs" },
-  { id: "CMP004", date: "2024-01-14", ward: "Wadgaon Sheri", type: "Missed Pickup", status: "in-progress", truck: "MH-12-IJ-7890", responseTime: "1 hr" },
-  { id: "CMP005", date: "2024-01-13", ward: "Kharadi West", type: "Spillage", status: "resolved", truck: "MH-12-CD-5678", responseTime: "3 hrs" },
-  { id: "CMP006", date: "2024-01-13", ward: "Hadapsar", type: "Missed Pickup", status: "pending", truck: "MH-12-KL-1122", responseTime: "-" },
-  { id: "CMP007", date: "2024-01-12", ward: "Magarpatta", type: "Irregular Timing", status: "resolved", truck: "MH-12-MN-3344", responseTime: "1.5 hrs" },
-  { id: "CMP008", date: "2024-01-12", ward: "Koregaon Park", type: "Spillage", status: "in-progress", truck: "MH-12-OP-5566", responseTime: "30 min" },
-  { id: "CMP009", date: "2024-01-11", ward: "Mundhwa", type: "Irregular Timing", status: "resolved", truck: "MH-12-QR-7788", responseTime: "2.5 hrs" },
-  { id: "CMP010", date: "2024-01-11", ward: "Keshav Nagar", type: "Missed Pickup", status: "pending", truck: "MH-12-ST-9900", responseTime: "-" },
-  { id: "CMP011", date: "2024-01-10", ward: "Wagholi", type: "Irregular Timing", status: "resolved", truck: "MH-12-UV-1212", responseTime: "3.5 hrs" },
-  { id: "CMP012", date: "2024-01-10", ward: "Lohegaon", type: "Spillage", status: "in-progress", truck: "MH-12-WX-3434", responseTime: "45 min" },
-];
-
-const dumpYardData = [
-  { site: "GCP Kharadi", entries: 45, totalWeight: 112.5, avgWeight: 2.5, peakHour: "10:00-11:00", capacity: 78 },
-  { site: "GCP Viman Nagar", entries: 38, totalWeight: 89.2, avgWeight: 2.35, peakHour: "11:00-12:00", capacity: 65 },
-  { site: "Dump Site Alpha", entries: 22, totalWeight: 198.0, avgWeight: 9.0, peakHour: "14:00-15:00", capacity: 45 },
-  { site: "Dump Site Beta", entries: 18, totalWeight: 162.0, avgWeight: 9.0, peakHour: "15:00-16:00", capacity: 38 },
-  { site: "GCP Hadapsar", entries: 52, totalWeight: 130.0, avgWeight: 2.5, peakHour: "09:00-10:00", capacity: 82 },
-  { site: "GCP Koregaon Park", entries: 35, totalWeight: 82.5, avgWeight: 2.36, peakHour: "10:30-11:30", capacity: 55 },
-  { site: "Dump Site Gamma", entries: 28, totalWeight: 252.0, avgWeight: 9.0, peakHour: "13:00-14:00", capacity: 52 },
-  { site: "GCP Magarpatta", entries: 40, totalWeight: 96.0, avgWeight: 2.4, peakHour: "11:00-12:00", capacity: 72 },
-  { site: "Dump Site Delta", entries: 15, totalWeight: 135.0, avgWeight: 9.0, peakHour: "16:00-17:00", capacity: 30 },
-  { site: "GCP Mundhwa", entries: 32, totalWeight: 76.8, avgWeight: 2.4, peakHour: "08:00-09:00", capacity: 60 },
-  { site: "GCP Wagholi", entries: 28, totalWeight: 67.2, avgWeight: 2.4, peakHour: "09:30-10:30", capacity: 48 },
-  { site: "Dump Site Epsilon", entries: 20, totalWeight: 180.0, avgWeight: 9.0, peakHour: "15:30-16:30", capacity: 42 },
-];
-
-const weeklyTrendData = [
-  { day: "Mon", collected: 45.2, missed: 8, efficiency: 94 },
-  { day: "Tue", collected: 48.5, missed: 5, efficiency: 96 },
-  { day: "Wed", collected: 42.8, missed: 12, efficiency: 88 },
-  { day: "Thu", collected: 50.1, missed: 4, efficiency: 97 },
-  { day: "Fri", collected: 47.3, missed: 6, efficiency: 95 },
-  { day: "Sat", collected: 52.0, missed: 3, efficiency: 98 },
-  { day: "Sun", collected: 35.2, missed: 2, efficiency: 96 },
-];
-
-const zoneWiseData = [
-  { name: "Zone A", value: 35, color: "hsl(var(--chart-1))" },
-  { name: "Zone B", value: 28, color: "hsl(var(--chart-2))" },
-  { name: "Zone C", value: 22, color: "hsl(var(--chart-3))" },
-  { name: "Zone D", value: 15, color: "hsl(var(--chart-4))" },
-];
-
-// Late Arrival Report Data
-const lateArrivalData = [
-  { id: 1, date: "2024-01-15", truck: "MH-12-AB-1234", driver: "Rajesh Kumar", route: "Route A-12", scheduledTime: "06:00", actualTime: "06:25", delay: 25, reason: "Traffic congestion", status: "late", zone: "North Zone", ward: "Aundh", vendor: "Mahesh Enterprises", routeType: "primary" },
-  { id: 2, date: "2024-01-15", truck: "MH-12-CD-5678", driver: "Amit Singh", route: "Route B-05", scheduledTime: "06:30", actualTime: "06:35", delay: 5, reason: "", status: "on-time", zone: "East Zone", ward: "Kharadi", vendor: "Mahesh Enterprises", routeType: "primary" },
-  { id: 3, date: "2024-01-15", truck: "MH-12-EF-9012", driver: "Suresh Patil", route: "Route C-08", scheduledTime: "07:00", actualTime: "07:45", delay: 45, reason: "Vehicle breakdown", status: "late", zone: "East Zone", ward: "Viman Nagar", vendor: "Mahesh Enterprises", routeType: "secondary" },
-  { id: 4, date: "2024-01-15", truck: "MH-12-GH-3456", driver: "Vikram Singh", route: "Route A-15", scheduledTime: "06:15", actualTime: "06:18", delay: 3, reason: "", status: "on-time", zone: "East Zone", ward: "Viman Nagar", vendor: "Mahesh Enterprises", routeType: "primary" },
-  { id: 5, date: "2024-01-14", truck: "MH-12-IJ-7890", driver: "Deepak Jadhav", route: "Route D-03", scheduledTime: "06:00", actualTime: "06:32", delay: 32, reason: "Driver reported late", status: "late", zone: "North Zone", ward: "Baner", vendor: "Green Transport Co", routeType: "primary" },
-  { id: 6, date: "2024-01-14", truck: "MH-12-KL-1122", driver: "Manoj Patil", route: "Route E-02", scheduledTime: "05:30", actualTime: "05:28", delay: -2, reason: "", status: "on-time", zone: "North Zone", ward: "Baner", vendor: "Green Transport Co", routeType: "secondary" },
-  { id: 7, date: "2024-01-14", truck: "MH-12-MN-3344", driver: "Ravi Deshmukh", route: "Route F-01", scheduledTime: "06:45", actualTime: "07:15", delay: 30, reason: "Fuel filling", status: "late", zone: "North Zone", ward: "Aundh", vendor: "Green Transport Co", routeType: "primary" },
-  { id: 8, date: "2024-01-13", truck: "MH-12-OP-5566", driver: "Sunil Yadav", route: "Route G-04", scheduledTime: "06:00", actualTime: "06:05", delay: 5, reason: "", status: "on-time", zone: "South Zone", ward: "Hadapsar", vendor: "City Waste Solutions", routeType: "primary" },
-  { id: 9, date: "2024-01-13", truck: "MH-12-QR-7788", driver: "Anil Sharma", route: "Route H-02", scheduledTime: "06:30", actualTime: "07:00", delay: 30, reason: "Road construction", status: "late", zone: "South Zone", ward: "Kondhwa", vendor: "City Waste Solutions", routeType: "secondary" },
-  { id: 10, date: "2024-01-13", truck: "MH-12-ST-9900", driver: "Prakash Rane", route: "Route I-01", scheduledTime: "06:15", actualTime: "06:12", delay: -3, reason: "", status: "on-time", zone: "West Zone", ward: "Kothrud", vendor: "City Waste Solutions", routeType: "primary" },
-  { id: 11, date: "2024-01-12", truck: "MH-12-UV-1212", driver: "Mahesh Yadav", route: "Route J-03", scheduledTime: "06:00", actualTime: "06:40", delay: 40, reason: "Personal emergency", status: "late", zone: "West Zone", ward: "Warje", vendor: "Green Transport Co", routeType: "secondary" },
-  { id: 12, date: "2024-01-12", truck: "MH-12-WX-3434", driver: "Ravi Sharma", route: "Route K-02", scheduledTime: "06:45", actualTime: "06:50", delay: 5, reason: "", status: "on-time", zone: "Central Zone", ward: "Deccan", vendor: "Mahesh Enterprises", routeType: "primary" },
-];
-
-// Driver Behavior Report Data
-const driverBehaviorData = [
-  { id: 1, date: "2024-01-15", time: "08:45", truck: "MH-12-AB-1234", driver: "Rajesh Kumar", driverId: "DRV001", incidentType: "Overspeeding", value: "72 km/h", limit: "60 km/h", location: "Kharadi Main Road", severity: "medium" },
-  { id: 2, date: "2024-01-15", time: "09:12", truck: "MH-12-EF-9012", driver: "Suresh Patil", driverId: "DRV003", incidentType: "Harsh Braking", value: "9.2 m/s²", limit: "8 m/s²", location: "Viman Nagar Junction", severity: "low" },
-  { id: 3, date: "2024-01-15", time: "10:30", truck: "MH-12-GH-3456", driver: "Vikram Singh", driverId: "DRV004", incidentType: "Overspeeding", value: "85 km/h", limit: "60 km/h", location: "Highway Section", severity: "high" },
-  { id: 4, date: "2024-01-15", time: "11:05", truck: "MH-12-MN-3344", driver: "Ravi Deshmukh", driverId: "DRV007", incidentType: "Rapid Acceleration", value: "10.5 m/s²", limit: "8 m/s²", location: "Sector 22", severity: "medium" },
-  { id: 5, date: "2024-01-14", time: "14:22", truck: "MH-12-AB-1234", driver: "Rajesh Kumar", driverId: "DRV001", incidentType: "Overspeeding", value: "68 km/h", limit: "60 km/h", location: "Wadgaon Sheri", severity: "low" },
-  { id: 6, date: "2024-01-14", time: "16:45", truck: "MH-12-CD-5678", driver: "Amit Singh", driverId: "DRV002", incidentType: "Harsh Braking", value: "11.2 m/s²", limit: "8 m/s²", location: "Kalyani Nagar", severity: "high" },
-  { id: 7, date: "2024-01-13", time: "07:30", truck: "MH-12-IJ-7890", driver: "Deepak Jadhav", driverId: "DRV005", incidentType: "Rapid Acceleration", value: "9.8 m/s²", limit: "8 m/s²", location: "Starting Point", severity: "medium" },
-  { id: 8, date: "2024-01-13", time: "09:15", truck: "MH-12-OP-5566", driver: "Sunil Yadav", driverId: "DRV008", incidentType: "Overspeeding", value: "75 km/h", limit: "60 km/h", location: "Hadapsar Ring Road", severity: "medium" },
-  { id: 9, date: "2024-01-13", time: "11:30", truck: "MH-12-QR-7788", driver: "Anil Sharma", driverId: "DRV009", incidentType: "Harsh Braking", value: "10.1 m/s²", limit: "8 m/s²", location: "Magarpatta Junction", severity: "medium" },
-  { id: 10, date: "2024-01-12", time: "08:00", truck: "MH-12-ST-9900", driver: "Prakash Rane", driverId: "DRV012", incidentType: "Rapid Acceleration", value: "9.5 m/s²", limit: "8 m/s²", location: "Koregaon Park", severity: "low" },
-  { id: 11, date: "2024-01-12", time: "13:45", truck: "MH-12-UV-1212", driver: "Mahesh Yadav", driverId: "DRV004", incidentType: "Overspeeding", value: "90 km/h", limit: "60 km/h", location: "Expressway", severity: "high" },
-  { id: 12, date: "2024-01-12", time: "15:20", truck: "MH-12-WX-3434", driver: "Ravi Sharma", driverId: "DRV005", incidentType: "Harsh Braking", value: "12.5 m/s²", limit: "8 m/s²", location: "Mundhwa Bridge", severity: "high" },
-];
-
-// Vehicle Status Report Data
-const vehicleStatusData = [
-  { id: "TRK-001", truck: "MH-12-AB-1234", type: "primary", driver: "Rajesh Kumar", status: "active", gpsStatus: "online", lastUpdate: "2 mins ago", batteryLevel: 92, signalStrength: 85, route: "Route A-12" },
-  { id: "TRK-002", truck: "MH-12-CD-5678", type: "secondary", driver: "Amit Singh", status: "active", gpsStatus: "online", lastUpdate: "5 mins ago", batteryLevel: 78, signalStrength: 72, route: "Route B-05" },
-  { id: "TRK-003", truck: "MH-12-EF-9012", type: "primary", driver: "Suresh Patil", status: "active", gpsStatus: "online", lastUpdate: "1 min ago", batteryLevel: 65, signalStrength: 90, route: "Route C-08" },
-  { id: "TRK-004", truck: "MH-12-GH-3456", type: "secondary", driver: "Vikram Singh", status: "active", gpsStatus: "online", lastUpdate: "Just now", batteryLevel: 88, signalStrength: 95, route: "Route A-15" },
-  { id: "TRK-005", truck: "MH-12-IJ-7890", type: "primary", driver: "Deepak Jadhav", status: "warning", gpsStatus: "warning", lastUpdate: "8 mins ago", batteryLevel: 25, signalStrength: 45, route: "Route D-03" },
-  { id: "TRK-006", truck: "MH-12-KL-1122", type: "primary", driver: "Manoj Patil", status: "inactive", gpsStatus: "offline", lastUpdate: "45 mins ago", batteryLevel: 12, signalStrength: 0, route: "Route E-02" },
-  { id: "TRK-007", truck: "MH-12-MN-3344", type: "secondary", driver: "Ravi Deshmukh", status: "active", gpsStatus: "online", lastUpdate: "1 min ago", batteryLevel: 70, signalStrength: 80, route: "Route F-01" },
-  { id: "TRK-008", truck: "MH-12-OP-5566", type: "primary", driver: "Sunil Yadav", status: "failed", gpsStatus: "offline", lastUpdate: "2 hours ago", batteryLevel: 0, signalStrength: 0, route: "Route G-04" },
-  { id: "TRK-009", truck: "MH-12-QR-7788", type: "secondary", driver: "Anil Sharma", status: "inactive", gpsStatus: "offline", lastUpdate: "1 hour ago", batteryLevel: 5, signalStrength: 0, route: "Route H-02" },
-  { id: "TRK-010", truck: "MH-12-ST-9900", type: "primary", driver: "Prakash Rane", status: "active", gpsStatus: "online", lastUpdate: "3 mins ago", batteryLevel: 85, signalStrength: 88, route: "Route I-01" },
-  { id: "TRK-011", truck: "MH-12-UV-1212", type: "secondary", driver: "Mahesh Yadav", status: "warning", gpsStatus: "warning", lastUpdate: "10 mins ago", batteryLevel: 30, signalStrength: 40, route: "Route J-03" },
-  { id: "TRK-012", truck: "MH-12-WX-3434", type: "primary", driver: "Ravi Sharma", status: "active", gpsStatus: "online", lastUpdate: "Just now", batteryLevel: 95, signalStrength: 92, route: "Route K-02" },
-];
-
-// Spare Truck Usage Report Data
-const spareUsageData = [
-  { id: 1, date: "2024-01-15", spareTruck: "MH-12-SP-1001", originalTruck: "MH-12-AB-1234", driver: "Spare Driver 1", route: "Route A-12", vendor: "Mahesh Fleet Services", breakdownReason: "Engine failure", activatedAt: "07:30", releasedAt: "14:45", duration: "7h 15m", status: "completed" },
-  { id: 2, date: "2024-01-15", spareTruck: "MH-12-SP-2001", originalTruck: "MH-12-GH-3456", driver: "Spare Driver 2", route: "Route A-15", vendor: "Green Transport Solutions", breakdownReason: "Tire puncture", activatedAt: "09:15", releasedAt: "12:30", duration: "3h 15m", status: "completed" },
-  { id: 3, date: "2024-01-14", spareTruck: "MH-12-SP-1001", originalTruck: "MH-12-EF-9012", driver: "Spare Driver 1", route: "Route C-08", vendor: "Mahesh Fleet Services", breakdownReason: "Brake issue", activatedAt: "06:45", releasedAt: "16:00", duration: "9h 15m", status: "completed" },
-  { id: 4, date: "2024-01-14", spareTruck: "MH-12-SP-2001", originalTruck: "MH-12-IJ-7890", driver: "Spare Driver 2", route: "Route D-03", vendor: "Green Transport Solutions", breakdownReason: "Starter motor failure", activatedAt: "08:00", releasedAt: null, duration: "Active", status: "active" },
-  { id: 5, date: "2024-01-13", spareTruck: "MH-12-SP-1001", originalTruck: "MH-12-CD-5678", driver: "Spare Driver 1", route: "Route B-05", vendor: "Mahesh Fleet Services", breakdownReason: "GPS device failure", activatedAt: "10:30", releasedAt: "15:45", duration: "5h 15m", status: "completed" },
-  { id: 6, date: "2024-01-13", spareTruck: "MH-12-SP-3001", originalTruck: "MH-12-KL-1122", driver: "Spare Driver 3", route: "Route E-02", vendor: "City Transport Co", breakdownReason: "Battery dead", activatedAt: "07:00", releasedAt: "10:30", duration: "3h 30m", status: "completed" },
-  { id: 7, date: "2024-01-12", spareTruck: "MH-12-SP-2001", originalTruck: "MH-12-MN-3344", driver: "Spare Driver 2", route: "Route F-01", vendor: "Green Transport Solutions", breakdownReason: "Clutch failure", activatedAt: "06:30", releasedAt: "15:00", duration: "8h 30m", status: "completed" },
-  { id: 8, date: "2024-01-12", spareTruck: "MH-12-SP-1001", originalTruck: "MH-12-OP-5566", driver: "Spare Driver 1", route: "Route G-04", vendor: "Mahesh Fleet Services", breakdownReason: "Hydraulic leak", activatedAt: "08:45", releasedAt: null, duration: "Active", status: "active" },
-  { id: 9, date: "2024-01-11", spareTruck: "MH-12-SP-3001", originalTruck: "MH-12-QR-7788", driver: "Spare Driver 3", route: "Route H-02", vendor: "City Transport Co", breakdownReason: "Fuel pump issue", activatedAt: "11:00", releasedAt: "16:30", duration: "5h 30m", status: "completed" },
-  { id: 10, date: "2024-01-11", spareTruck: "MH-12-SP-2001", originalTruck: "MH-12-ST-9900", driver: "Spare Driver 2", route: "Route I-01", vendor: "Green Transport Solutions", breakdownReason: "AC failure", activatedAt: "09:00", releasedAt: "14:00", duration: "5h 00m", status: "completed" },
-  { id: 11, date: "2024-01-10", spareTruck: "MH-12-SP-1001", originalTruck: "MH-12-UV-1212", driver: "Spare Driver 1", route: "Route J-03", vendor: "Mahesh Fleet Services", breakdownReason: "Radiator leak", activatedAt: "07:15", releasedAt: "13:45", duration: "6h 30m", status: "completed" },
-  { id: 12, date: "2024-01-10", spareTruck: "MH-12-SP-3001", originalTruck: "MH-12-WX-3434", driver: "Spare Driver 3", route: "Route K-02", vendor: "City Transport Co", breakdownReason: "Suspension issue", activatedAt: "10:00", releasedAt: "17:00", duration: "7h 00m", status: "completed" },
-];
+// Reports data is loaded from the backend.
 
 const ITEMS_PER_PAGE = 5;
+
+const getDateValue = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value : undefined;
+
+const safeParseISO = (value?: string) => (value ? parseISO(value) : null);
+
+const getTruckInsuranceDate = (truck: any) =>
+  getDateValue(truck.insuranceExpiry ?? truck.insurance_expiry);
+
+const getTruckFitnessDate = (truck: any) =>
+  getDateValue(truck.fitnessExpiry ?? truck.fitness_expiry);
+
+const getDriverLicenseDate = (driver: any) =>
+  getDateValue(driver.licenseExpiry ?? driver.license_expiry);
 
 export default function Reports() {
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "daily";
   const { toast } = useToast();
   
+  // API Hooks
+  const { data: trucksData = [] } = useTrucks();
+  const { data: driversData = [] } = useDrivers();
+  const { data: reportsData = {}, isLoading: isLoadingReports } = useReportsData();
+  
+  // State for API data
+  const [trucks, setTrucks] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  
+  // Sync API data to state
+  useEffect(() => {
+    setTrucks(trucksData);
+  }, [trucksData]);
+  
+  useEffect(() => {
+    setDrivers(driversData);
+  }, [driversData]);
+  
+  const today = format(new Date(), "yyyy-MM-dd");
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [dateFrom, setDateFrom] = useState("2024-01-15");
-  const [dateTo, setDateTo] = useState("2024-01-15");
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(today);
   const [selectedZone, setSelectedZone] = useState("all");
   const [selectedWard, setSelectedWard] = useState("all");
   const [selectedTruck, setSelectedTruck] = useState("all");
+
+  const dailyPickupCoverageData: any[] = (reportsData as any).daily_pickup_coverage || [];
+  const routePerformanceData: any[] = (reportsData as any).route_performance || [];
+  const truckUtilizationData: any[] = (reportsData as any).truck_utilization || [];
+  const fuelConsumptionData: any[] = (reportsData as any).fuel_consumption || [];
+  const driverAttendanceData: any[] = (reportsData as any).driver_attendance || [];
+  const complaintsData: any[] = (reportsData as any).complaints || [];
+  const dumpYardData: any[] = (reportsData as any).dump_yard || [];
+  const weeklyTrendData: any[] = (reportsData as any).weekly_trend || [];
+  const zoneWiseData: any[] = (reportsData as any).zone_wise || [];
+  const lateArrivalData: any[] = (reportsData as any).late_arrival || [];
+  const driverBehaviorData: any[] = (reportsData as any).driver_behavior || [];
+  const vehicleStatusData: any[] = (reportsData as any).vehicle_status || [];
+  const spareUsageData: any[] = (reportsData as any).spare_usage || [];
   
   // Email export dialog state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
@@ -468,18 +331,17 @@ export default function Reports() {
       </Dialog>
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Reports Center</h1>
-          <p className="text-muted-foreground">Generate, filter and download comprehensive fleet reports</p>
-        </div>
-      <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            <FileText className="h-3 w-3 mr-1" />
-            12 Report Types
-          </Badge>
-        </div>
-      </div>
+      <PageHeader
+        category="Analytics"
+        title="Reports Center"
+        description="Generate, filter and download comprehensive fleet reports"
+        icon={FileText}
+        badge={{
+          label: "12 Report Types",
+          variant: "outline",
+          className: "bg-primary/10 text-primary border-primary/20",
+        }}
+      />
 
       {/* Global Filters */}
       <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
@@ -1965,7 +1827,7 @@ export default function Reports() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Scale className="h-5 w-5 text-primary" />
-                  Dump Yard & GCP Log Report
+                  Dump Yard & GTP Log Report
                 </CardTitle>
                 <CardDescription>Entry counts, weight per trip, and site capacity utilization</CardDescription>
               </div>
@@ -2099,21 +1961,45 @@ export default function Reports() {
               {/* Summary Cards */}
               {(() => {
                 const today = new Date();
-                const truckInsuranceExpiring = mockTrucks.filter(t => {
-                  const days = differenceInDays(parseISO(t.insuranceExpiry), today);
+                const truckInsuranceExpiring = trucks.filter((t) => {
+                  const insuranceDate = getTruckInsuranceDate(t);
+                  const insuranceParsed = safeParseISO(insuranceDate);
+                  if (!insuranceParsed) return false;
+                  const days = differenceInDays(insuranceParsed, today);
                   return days >= 0 && days <= 30;
                 }).length;
-                const truckInsuranceExpired = mockTrucks.filter(t => differenceInDays(parseISO(t.insuranceExpiry), today) < 0).length;
-                const truckFitnessExpiring = mockTrucks.filter(t => {
-                  const days = differenceInDays(parseISO(t.fitnessExpiry), today);
+                const truckInsuranceExpired = trucks.filter((t) => {
+                  const insuranceDate = getTruckInsuranceDate(t);
+                  const insuranceParsed = safeParseISO(insuranceDate);
+                  if (!insuranceParsed) return false;
+                  return differenceInDays(insuranceParsed, today) < 0;
+                }).length;
+                const truckFitnessExpiring = trucks.filter((t) => {
+                  const fitnessDate = getTruckFitnessDate(t);
+                  const fitnessParsed = safeParseISO(fitnessDate);
+                  if (!fitnessParsed) return false;
+                  const days = differenceInDays(fitnessParsed, today);
                   return days >= 0 && days <= 30;
                 }).length;
-                const truckFitnessExpired = mockTrucks.filter(t => differenceInDays(parseISO(t.fitnessExpiry), today) < 0).length;
-                const driverLicenseExpiring = mockDrivers.filter(d => {
-                  const days = differenceInDays(parseISO(d.licenseExpiry), today);
+                const truckFitnessExpired = trucks.filter((t) => {
+                  const fitnessDate = getTruckFitnessDate(t);
+                  const fitnessParsed = safeParseISO(fitnessDate);
+                  if (!fitnessParsed) return false;
+                  return differenceInDays(fitnessParsed, today) < 0;
+                }).length;
+                const driverLicenseExpiring = drivers.filter((d) => {
+                  const licenseDate = getDriverLicenseDate(d);
+                  const licenseParsed = safeParseISO(licenseDate);
+                  if (!licenseParsed) return false;
+                  const days = differenceInDays(licenseParsed, today);
                   return days >= 0 && days <= 30;
                 }).length;
-                const driverLicenseExpired = mockDrivers.filter(d => differenceInDays(parseISO(d.licenseExpiry), today) < 0).length;
+                const driverLicenseExpired = drivers.filter((d) => {
+                  const licenseDate = getDriverLicenseDate(d);
+                  const licenseParsed = safeParseISO(licenseDate);
+                  if (!licenseParsed) return false;
+                  return differenceInDays(licenseParsed, today) < 0;
+                }).length;
 
                 return (
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -2165,7 +2051,7 @@ export default function Reports() {
                     Truck Insurance & Fitness Expiry
                   </h3>
                   <Badge variant="outline" className="text-xs">
-                    {mockTrucks.length} Trucks
+                    {trucks.length} Trucks
                   </Badge>
                 </div>
                 <div className="rounded-md border">
@@ -2182,12 +2068,17 @@ export default function Reports() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginate(mockTrucks, expiryTruckPage).map((truck) => {
+                      {paginate(trucks, expiryTruckPage).map((truck) => {
                         const today = new Date();
-                        const insuranceDays = differenceInDays(parseISO(truck.insuranceExpiry), today);
-                        const fitnessDays = differenceInDays(parseISO(truck.fitnessExpiry), today);
+                        const insuranceDate = getTruckInsuranceDate(truck);
+                        const fitnessDate = getTruckFitnessDate(truck);
+                        const insuranceParsed = safeParseISO(insuranceDate);
+                        const fitnessParsed = safeParseISO(fitnessDate);
+                        const insuranceDays = insuranceParsed ? differenceInDays(insuranceParsed, today) : null;
+                        const fitnessDays = fitnessParsed ? differenceInDays(fitnessParsed, today) : null;
                         
-                        const getStatusBadge = (days: number) => {
+                        const getStatusBadge = (days: number | null) => {
+                          if (days === null) return <Badge variant="secondary">Unknown</Badge>;
                           if (days < 0) return <Badge variant="destructive">Expired</Badge>;
                           if (days <= 7) return <Badge className="bg-orange-500 text-white">Critical ({days}d)</Badge>;
                           if (days <= 30) return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700">Warning ({days}d)</Badge>;
@@ -2196,12 +2087,12 @@ export default function Reports() {
 
                         return (
                           <TableRow key={truck.id}>
-                            <TableCell className="font-mono font-medium">{truck.registrationNumber}</TableCell>
-                            <TableCell className="capitalize">{truck.type.replace('-', ' ')}</TableCell>
-                            <TableCell>{truck.vendorId}</TableCell>
-                            <TableCell>{format(parseISO(truck.insuranceExpiry), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="font-mono font-medium">{truck.registrationNumber ?? truck.registration_number ?? truck.id}</TableCell>
+                            <TableCell className="capitalize">{(truck.type || "").replace('-', ' ')}</TableCell>
+                            <TableCell>{truck.vendorId ?? truck.vendor_id ?? "-"}</TableCell>
+                            <TableCell>{insuranceParsed ? format(insuranceParsed, 'dd MMM yyyy') : "N/A"}</TableCell>
                             <TableCell>{getStatusBadge(insuranceDays)}</TableCell>
-                            <TableCell>{format(parseISO(truck.fitnessExpiry), 'dd MMM yyyy')}</TableCell>
+                            <TableCell>{fitnessParsed ? format(fitnessParsed, 'dd MMM yyyy') : "N/A"}</TableCell>
                             <TableCell>{getStatusBadge(fitnessDays)}</TableCell>
                           </TableRow>
                         );
@@ -2209,7 +2100,7 @@ export default function Reports() {
                     </TableBody>
                   </Table>
                 </div>
-                {renderPagination(expiryTruckPage, mockTrucks.length, setExpiryTruckPage)}
+                {renderPagination(expiryTruckPage, trucks.length, setExpiryTruckPage)}
               </div>
 
               {/* Driver License Table */}
@@ -2220,7 +2111,7 @@ export default function Reports() {
                     Driver License Expiry
                   </h3>
                   <Badge variant="outline" className="text-xs">
-                    {mockDrivers.length} Drivers
+                    {drivers.length} Drivers
                   </Badge>
                 </div>
                 <div className="rounded-md border">
@@ -2237,11 +2128,14 @@ export default function Reports() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginate(mockDrivers, expiryDriverPage).map((driver) => {
+                      {paginate(drivers, expiryDriverPage).map((driver) => {
                         const today = new Date();
-                        const licenseDays = differenceInDays(parseISO(driver.licenseExpiry), today);
+                        const licenseDate = getDriverLicenseDate(driver);
+                        const licenseParsed = safeParseISO(licenseDate);
+                        const licenseDays = licenseParsed ? differenceInDays(licenseParsed, today) : null;
                         
-                        const getStatusBadge = (days: number) => {
+                        const getStatusBadge = (days: number | null) => {
+                          if (days === null) return <Badge variant="secondary">Unknown</Badge>;
                           if (days < 0) return <Badge variant="destructive">Expired</Badge>;
                           if (days <= 7) return <Badge className="bg-orange-500 text-white">Critical</Badge>;
                           if (days <= 30) return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700">Warning</Badge>;
@@ -2253,11 +2147,11 @@ export default function Reports() {
                             <TableCell className="font-mono">{driver.id}</TableCell>
                             <TableCell className="font-medium">{driver.name}</TableCell>
                             <TableCell>{driver.phone}</TableCell>
-                            <TableCell className="font-mono text-xs">{driver.licenseNumber}</TableCell>
-                            <TableCell>{format(parseISO(driver.licenseExpiry), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="font-mono text-xs">{driver.licenseNumber ?? driver.license_number ?? "-"}</TableCell>
+                            <TableCell>{licenseParsed ? format(licenseParsed, 'dd MMM yyyy') : "N/A"}</TableCell>
                             <TableCell>{getStatusBadge(licenseDays)}</TableCell>
-                            <TableCell className={`font-medium ${licenseDays < 0 ? 'text-red-600' : licenseDays <= 7 ? 'text-orange-600' : licenseDays <= 30 ? 'text-yellow-600' : 'text-green-600'}`}>
-                              {licenseDays < 0 ? `${Math.abs(licenseDays)} days ago` : `${licenseDays} days`}
+                            <TableCell className={`font-medium ${licenseDays === null ? 'text-muted-foreground' : licenseDays < 0 ? 'text-red-600' : licenseDays <= 7 ? 'text-orange-600' : licenseDays <= 30 ? 'text-yellow-600' : 'text-green-600'}`}>
+                              {licenseDays === null ? "N/A" : licenseDays < 0 ? `${Math.abs(licenseDays)} days ago` : `${licenseDays} days`}
                             </TableCell>
                           </TableRow>
                         );
@@ -2265,7 +2159,7 @@ export default function Reports() {
                     </TableBody>
                   </Table>
                 </div>
-                {renderPagination(expiryDriverPage, mockDrivers.length, setExpiryDriverPage)}
+                {renderPagination(expiryDriverPage, drivers.length, setExpiryDriverPage)}
               </div>
             </CardContent>
           </Card>

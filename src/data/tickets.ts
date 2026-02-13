@@ -78,8 +78,8 @@ export const tickets: Ticket[] = [
   },
   {
     id: 'TKT002',
-    title: 'Missed Pickup at EON IT Park',
-    description: 'Multiple citizen complaints about missed pickup at Kharadi. Need immediate attention.',
+    title: 'Missed Pickup at Viman Nagar Ward',
+    description: 'Multiple citizen complaints about a missed pickup in Viman Nagar. Needs immediate attention.',
     category: 'pickup_issue',
     priority: 'critical',
     status: 'open',
@@ -118,8 +118,8 @@ export const tickets: Ticket[] = [
   },
   {
     id: 'TKT004',
-    title: 'Citizen Complaint - Late Pickup at Magarpatta',
-    description: 'Resident reported late garbage collection at Magarpatta City, Hadapsar',
+    title: 'Citizen Complaint - Late Pickup at Baner',
+    description: 'Resident reported late garbage collection near Baner Road. Follow up required.',
     category: 'complaint',
     priority: 'medium',
     status: 'resolved',
@@ -156,6 +156,46 @@ export const tickets: Ticket[] = [
     comments: [
       { id: 'CMT008', ticketId: 'TKT005', author: 'Driver', content: 'Traffic congestion near Westend Mall during morning hours - Vijay Deshmukh', createdAt: '2024-03-05T11:00:00Z', isInternal: false },
       { id: 'CMT009', ticketId: 'TKT005', author: 'Route Planner', content: 'Route optimized. Start time adjusted to 5:30 AM', createdAt: '2024-03-07T15:30:00Z', isInternal: false }
+    ]
+  }
+  ,
+  {
+    id: 'TKT006',
+    title: 'GTC Checkpoint - Low Truck Cleanliness Score',
+    description: 'Recent GTC checkpoint shows low cleanliness score for TRK003. Request inspection and cleaning.',
+    category: 'vehicle_issue',
+    priority: 'medium',
+    status: 'open',
+    createdAt: '2024-03-11T07:45:00Z',
+    updatedAt: '2024-03-11T07:45:00Z',
+    dueDate: '2024-03-12T12:00:00Z',
+    assignedTo: 'Fleet Manager',
+    createdBy: 'GTC Checkpoint',
+    relatedTruckId: 'TRK003',
+    escalationLevel: 0,
+    slaBreached: false,
+    comments: [
+      { id: 'CMT010', ticketId: 'TKT006', author: 'GTC Checkpoint', content: 'Score recorded below 5.0', createdAt: '2024-03-11T07:45:00Z', isInternal: true }
+    ]
+  },
+  {
+    id: 'TKT007',
+    title: 'Driver Report - Route Delay Due to Road Closure',
+    description: 'Driver reported a temporary road closure affecting RT002. Route timing needs adjustment for today.',
+    category: 'route_issue',
+    priority: 'low',
+    status: 'pending',
+    createdAt: '2024-03-11T06:20:00Z',
+    updatedAt: '2024-03-11T08:10:00Z',
+    dueDate: '2024-03-11T14:00:00Z',
+    assignedTo: 'Route Planner',
+    createdBy: 'Driver Feedback',
+    relatedTruckId: 'TRK002',
+    relatedDriverId: 'DRV002',
+    escalationLevel: 0,
+    slaBreached: false,
+    comments: [
+      { id: 'CMT011', ticketId: 'TKT007', author: 'Driver', content: 'Detour added 25 minutes to route.', createdAt: '2024-03-11T06:20:00Z', isInternal: false }
     ]
   }
 ];

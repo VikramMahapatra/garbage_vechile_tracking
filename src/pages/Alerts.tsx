@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -69,193 +70,118 @@ import {
   Legend,
 } from "recharts";
 import { ActionDropdown } from "@/components/ActionDropdown";
+import { useAlerts } from "@/hooks/useDataQueries";
+import { Loader2 } from "lucide-react";
 
-// Alert types and data
-const alertTypes = [
-  { id: "all", label: "All Alerts", icon: Bell },
-  { id: "route_deviation", label: "Route Deviation", icon: Navigation },
-  { id: "missed_pickup", label: "Missed Pickup", icon: MapPinOff },
-  { id: "unauthorized_halt", label: "Unauthorized Halt", icon: Clock },
-  { id: "speed_violation", label: "Speed Violation", icon: Gauge },
-  { id: "geofence_breach", label: "Geofence Breach", icon: Shield },
-  { id: "device_tamper", label: "Device Tamper", icon: AlertTriangle },
-];
+// Alert metadata and helpers
+type AlertItem = {
+  id: number | string;
+  type: string;
+  truck: string;
+  route: string;
+  driver: string;
+  driverPhone: string;
+  vendorName: string;
+  vendorPhone: string;
+  message: string;
+  location: string;
+  date: string;
+  time: string;
+  timestamp: string;
+  severity: string;
+  zone: string;
+  ward: string;
+  status: string;
+};
 
-const activeAlerts = [
-  {
-    id: 1,
-    type: "route_deviation",
-    truck: "TRK-002",
-    driver: "Ramesh Kumar",
-    driverPhone: "+919876543210",
-    vendorName: "FleetCo Transport",
-    vendorPhone: "+919876543220",
-    message: "Deviated from assigned route by 350m near Kharadi IT Park",
-    location: "18.5523, 73.9423",
-    time: "5 min ago",
-    timestamp: "2024-01-15 09:45:00",
-    severity: "high",
-    zone: "Zone A",
-    status: "active",
-  },
-  {
-    id: 2,
-    type: "missed_pickup",
-    truck: "TRK-004",
-    driver: "Suresh Patil",
-    driverPhone: "+919876543211",
-    vendorName: "Metro Logistics",
-    vendorPhone: "+919876543221",
-    message: "Missed scheduled pickup at Zone C - Point 12 (Hospital Waste)",
-    location: "18.5612, 73.9356",
-    time: "12 min ago",
-    timestamp: "2024-01-15 09:38:00",
-    severity: "critical",
-    zone: "Zone C",
-    status: "active",
-  },
-  {
-    id: 3,
-    type: "unauthorized_halt",
-    truck: "TRK-002",
-    driver: "Ramesh Kumar",
-    driverPhone: "+919876543210",
-    vendorName: "FleetCo Transport",
-    vendorPhone: "+919876543220",
-    message: "Unauthorized halt detected for 15 minutes outside designated area",
-    location: "18.5534, 73.9445",
-    time: "18 min ago",
-    timestamp: "2024-01-15 09:32:00",
-    severity: "medium",
-    zone: "Zone A",
-    status: "active",
-  },
-  {
-    id: 4,
-    type: "speed_violation",
-    truck: "TRK-007",
-    driver: "Mahesh Jadhav",
-    driverPhone: "+919876543212",
-    vendorName: "City Fleet Services",
-    vendorPhone: "+919876543222",
-    message: "Speed limit exceeded: 65 km/h in 40 km/h zone",
-    location: "18.5489, 73.9312",
-    time: "25 min ago",
-    timestamp: "2024-01-15 09:25:00",
-    severity: "high",
-    zone: "Zone B",
-    status: "active",
-  },
-  {
-    id: 5,
-    type: "geofence_breach",
-    truck: "TRK-011",
-    driver: "Prakash More",
-    driverPhone: "+919876543213",
-    vendorName: "Metro Logistics",
-    vendorPhone: "+919876543221",
-    message: "Exited designated collection zone boundary",
-    location: "18.5678, 73.9234",
-    time: "32 min ago",
-    timestamp: "2024-01-15 09:18:00",
-    severity: "medium",
-    zone: "Zone D",
-    status: "acknowledged",
-  },
-  {
-    id: 6,
-    type: "device_tamper",
-    truck: "TRK-015",
-    driver: "Vijay Shinde",
-    driverPhone: "+919876543214",
-    vendorName: "FleetCo Transport",
-    vendorPhone: "+919876543220",
-    message: "GPS device disconnection detected - possible tampering",
-    location: "18.5456, 73.9567",
-    time: "45 min ago",
-    timestamp: "2024-01-15 09:05:00",
-    severity: "critical",
-    zone: "Zone E",
-    status: "investigating",
-  },
-  {
-    id: 7,
-    type: "route_deviation",
-    truck: "TRK-009",
-    driver: "Anil Gaikwad",
-    driverPhone: "+919876543215",
-    vendorName: "City Fleet Services",
-    vendorPhone: "+919876543222",
-    message: "Off-route for extended period (>500m deviation)",
-    location: "18.5398, 73.9478",
-    time: "52 min ago",
-    timestamp: "2024-01-15 08:58:00",
-    severity: "high",
-    zone: "Zone B",
-    status: "active",
-  },
-  {
-    id: 8,
-    type: "missed_pickup",
-    truck: "TRK-003",
-    driver: "Santosh Kulkarni",
-    driverPhone: "+919876543216",
-    vendorName: "Metro Logistics",
-    vendorPhone: "+919876543221",
-    message: "Skipped 3 consecutive pickup points in residential area",
-    location: "18.5567, 73.9289",
-    time: "1 hr ago",
-    timestamp: "2024-01-15 08:50:00",
-    severity: "critical",
-    zone: "Zone A",
-    status: "active",
-  },
-];
+const alertTypeMeta: Record<string, { label: string; icon: typeof Bell }> = {
+  route_deviation: { label: "Route Deviation", icon: Navigation },
+  missed_pickup: { label: "Missed Pickup", icon: MapPinOff },
+  unauthorized_halt: { label: "Unauthorized Halt", icon: Clock },
+  speed_violation: { label: "Speed Violation", icon: Gauge },
+  geofence_breach: { label: "Geofence Breach", icon: Shield },
+  device_tamper: { label: "Device Tamper", icon: AlertTriangle },
+};
 
-const violationHistory = [
-  { id: 1, truck: "TRK-002", driver: "Ramesh Kumar", type: "Route Deviation", count: 12, lastOccurrence: "Today", trend: "up" },
-  { id: 2, truck: "TRK-004", driver: "Suresh Patil", type: "Missed Pickup", count: 8, lastOccurrence: "Today", trend: "up" },
-  { id: 3, truck: "TRK-007", driver: "Mahesh Jadhav", type: "Speed Violation", count: 15, lastOccurrence: "Today", trend: "stable" },
-  { id: 4, truck: "TRK-011", driver: "Prakash More", type: "Geofence Breach", count: 5, lastOccurrence: "Yesterday", trend: "down" },
-  { id: 5, truck: "TRK-015", driver: "Vijay Shinde", type: "Device Tamper", count: 2, lastOccurrence: "Today", trend: "up" },
-  { id: 6, truck: "TRK-009", driver: "Anil Gaikwad", type: "Unauthorized Halt", count: 7, lastOccurrence: "Yesterday", trend: "down" },
-  { id: 7, truck: "TRK-003", driver: "Santosh Kulkarni", type: "Missed Pickup", count: 11, lastOccurrence: "Today", trend: "stable" },
-  { id: 8, truck: "TRK-006", driver: "Dinesh Pawar", type: "Route Deviation", count: 4, lastOccurrence: "2 days ago", trend: "down" },
-];
+const toTitleCase = (value: string) =>
+  value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
-const alertTrendData = [
-  { time: "6 AM", routeDeviation: 2, missedPickup: 1, speedViolation: 0, geofenceBreach: 1, other: 0 },
-  { time: "7 AM", routeDeviation: 5, missedPickup: 3, speedViolation: 2, geofenceBreach: 0, other: 1 },
-  { time: "8 AM", routeDeviation: 8, missedPickup: 4, speedViolation: 4, geofenceBreach: 2, other: 2 },
-  { time: "9 AM", routeDeviation: 12, missedPickup: 6, speedViolation: 5, geofenceBreach: 3, other: 1 },
-  { time: "10 AM", routeDeviation: 7, missedPickup: 5, speedViolation: 3, geofenceBreach: 1, other: 2 },
-  { time: "11 AM", routeDeviation: 4, missedPickup: 2, speedViolation: 2, geofenceBreach: 0, other: 1 },
-];
+const formatDate = (value: Date) => value.toISOString().split("T")[0];
 
-const alertDistribution = [
-  { name: "Route Deviation", value: 35, color: "hsl(var(--chart-1))" },
-  { name: "Missed Pickup", value: 25, color: "hsl(var(--chart-2))" },
-  { name: "Speed Violation", value: 20, color: "hsl(var(--chart-3))" },
-  { name: "Unauthorized Halt", value: 12, color: "hsl(var(--chart-4))" },
-  { name: "Geofence Breach", value: 5, color: "hsl(var(--chart-5))" },
-  { name: "Device Tamper", value: 3, color: "hsl(var(--destructive))" },
-];
+const getDefaultDateRange = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 9);
+  return { start: formatDate(start), end: formatDate(end) };
+};
 
-const zoneAlertData = [
-  { zone: "Zone A", critical: 5, high: 8, medium: 12, low: 3 },
-  { zone: "Zone B", critical: 3, high: 6, medium: 9, low: 5 },
-  { zone: "Zone C", critical: 7, high: 4, medium: 6, low: 2 },
-  { zone: "Zone D", critical: 2, high: 5, medium: 8, low: 4 },
-  { zone: "Zone E", critical: 4, high: 7, medium: 5, low: 6 },
-];
 
 export default function Alerts() {
+  const { data: alertsData = [], isLoading: isLoadingAlerts } = useAlerts();
+  
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [selectedType, setSelectedType] = useState("all");
   const [selectedSeverity, setSelectedSeverity] = useState("all");
   const [selectedZone, setSelectedZone] = useState("all");
+  const [selectedWard, setSelectedWard] = useState("all");
+  const [selectedStartDate, setSelectedStartDate] = useState(() => getDefaultDateRange().start);
+  const [selectedEndDate, setSelectedEndDate] = useState(() => getDefaultDateRange().end);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAlert, setSelectedAlert] = useState<typeof activeAlerts[0] | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  useEffect(() => {
+    // Validate and map API data to ensure all fields exist
+    const validatedAlerts = alertsData.map((item: any) => ({
+      id: item.id || Math.random(),
+      type: item.type || item.alert_type || "route_deviation",
+      truck: item.truck_registration_number || item.registration_number || item.truck || item.truck_number || item.truck_id || "UNKNOWN",
+      route: item.route_name || item.route || item.route_id || "Unknown Route",
+      driver: item.driver || item.driver_name || "Unknown",
+      driverPhone: item.driverPhone || item.driver_phone || "",
+      vendorName: item.vendorName || item.vendor_name || "Unknown",
+      vendorPhone: item.vendorPhone || item.vendor_phone || "",
+      message: item.message || item.alert_message || "",
+      location: item.location || item.coordinates || "0,0",
+      date: item.date || (item.timestamp ? item.timestamp.split(" ")[0] : formatDate(new Date())),
+      time: item.time || (item.created_at ? new Date(item.created_at).toLocaleTimeString() : "unknown"),
+      timestamp: item.timestamp || item.created_at || "unknown",
+      severity: item.severity || "medium",
+      zone: item.zone_name || item.zone || item.zone_id || "Unknown Zone",
+      ward: item.ward_name || item.ward || item.ward_id || "Unknown Ward",
+      status: item.status || "active",
+    })) as AlertItem[];
+    setAlerts(validatedAlerts);
+  }, [alertsData]);
+
+  const alertTypeOptions = useMemo(() => {
+    const types = Array.from(new Set(alerts.map((alert) => alert.type).filter(Boolean)));
+    return types.sort().map((type) => ({
+      id: type,
+      label: alertTypeMeta[type]?.label ?? toTitleCase(type),
+      icon: alertTypeMeta[type]?.icon ?? Bell,
+    }));
+  }, [alerts]);
+
+  const alertTypeSelectOptions = useMemo(
+    () => [{ id: "all", label: "All Alerts", icon: Bell }, ...alertTypeOptions],
+    [alertTypeOptions]
+  );
+
+  const severityOptions = useMemo(() => {
+    const severities = Array.from(new Set(alerts.map((alert) => alert.severity).filter(Boolean)));
+    return severities.sort();
+  }, [alerts]);
+
+  const zoneOptions = useMemo(() => {
+    const zones = Array.from(new Set(alerts.map((alert) => alert.zone).filter(Boolean)));
+    return zones.sort();
+  }, [alerts]);
+
+  const wardOptions = useMemo(() => {
+    const wards = Array.from(new Set(alerts.map((alert) => alert.ward).filter(Boolean)));
+    return wards.sort();
+  }, [alerts]);
 
   const getAlertIcon = (type: string) => {
     switch (type) {
@@ -289,23 +215,118 @@ export default function Alerts() {
     }
   };
 
-  const filteredAlerts = activeAlerts.filter((alert) => {
-    const matchesType = selectedType === "all" || alert.type === selectedType;
-    const matchesSeverity = selectedSeverity === "all" || alert.severity === selectedSeverity;
-    const matchesZone = selectedZone === "all" || alert.zone === selectedZone;
+  const filteredAlerts = alerts.filter((alert) => {
+    const matchesType = selectedType === "all" || (alert.type || "") === selectedType;
+    const matchesSeverity = selectedSeverity === "all" || (alert.severity || "") === selectedSeverity;
+    const matchesZone = selectedZone === "all" || (alert.zone || "") === selectedZone;
+    const matchesWard = selectedWard === "all" || (alert.ward || "") === selectedWard;
+    const hasDateRange = Boolean(selectedStartDate && selectedEndDate);
+    const matchesDateRange = !hasDateRange || ((alert.date || "") >= selectedStartDate && (alert.date || "") <= selectedEndDate);
     const matchesSearch = searchQuery === "" || 
-      alert.truck.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      alert.driver.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      alert.message.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesSeverity && matchesZone && matchesSearch;
+      (alert.truck || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (alert.driver || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (alert.message || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSeverity && matchesZone && matchesWard && matchesDateRange && matchesSearch;
   });
 
-  const criticalCount = activeAlerts.filter(a => a.severity === "critical").length;
-  const highCount = activeAlerts.filter(a => a.severity === "high").length;
+  const alertDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredAlerts.forEach((alert) => {
+      const type = alert.type || "unknown";
+      counts[type] = (counts[type] || 0) + 1;
+    });
+
+    const typeOrder = Object.keys(alertTypeMeta);
+    const extraTypes = Object.keys(counts).filter((type) => !typeOrder.includes(type)).sort();
+    const orderedTypes = [...typeOrder.filter((type) => counts[type]), ...extraTypes];
+    const colors = [
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+      "hsl(var(--destructive))",
+    ];
+
+    return orderedTypes.map((type, index) => ({
+      name: alertTypeMeta[type]?.label ?? toTitleCase(type),
+      value: counts[type] || 0,
+      color: colors[index % colors.length],
+    }));
+  }, [filteredAlerts]);
+
+  const alertTrendData = useMemo(() => {
+    const trendTypeMap: Record<string, string> = {
+      route_deviation: "routeDeviation",
+      missed_pickup: "missedPickup",
+      speed_violation: "speedViolation",
+      geofence_breach: "geofenceBreach",
+    };
+    const targetDate = selectedEndDate || formatDate(new Date());
+    const formatHour = (hour: number) => {
+      const period = hour >= 12 ? "PM" : "AM";
+      const value = hour % 12 || 12;
+      return `${value} ${period}`;
+    };
+
+    const buckets = Array.from({ length: 24 }, (_, hour) => ({
+      time: formatHour(hour),
+      routeDeviation: 0,
+      missedPickup: 0,
+      speedViolation: 0,
+      geofenceBreach: 0,
+      other: 0,
+    }));
+
+    filteredAlerts.forEach((alert) => {
+      const alertDate = alert.date || "";
+      if (alertDate !== targetDate) {
+        return;
+      }
+
+      let timestampValue = alert.timestamp || "";
+      if (timestampValue && timestampValue.includes(" ")) {
+        timestampValue = timestampValue.replace(" ", "T");
+      }
+      const parsedDate = timestampValue ? new Date(timestampValue) : new Date(`${alertDate}T00:00:00`);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return;
+      }
+
+      const hour = parsedDate.getHours();
+      const mappedKey = trendTypeMap[alert.type || ""];
+      if (mappedKey && buckets[hour]) {
+        buckets[hour][mappedKey] += 1;
+      } else if (buckets[hour]) {
+        buckets[hour].other += 1;
+      }
+    });
+
+    return buckets;
+  }, [filteredAlerts, selectedEndDate]);
+
+  const zoneAlertData = useMemo(() => {
+    const zoneMap: Record<string, { zone: string; critical: number; high: number; medium: number; low: number }> = {};
+    filteredAlerts.forEach((alert) => {
+      const zone = alert.zone || "Unknown Zone";
+      if (!zoneMap[zone]) {
+        zoneMap[zone] = { zone, critical: 0, high: 0, medium: 0, low: 0 };
+      }
+      const severity = alert.severity || "low";
+      if (severity in zoneMap[zone]) {
+        zoneMap[zone][severity as "critical" | "high" | "medium" | "low"] += 1;
+      }
+    });
+
+    return Object.values(zoneMap).sort((a, b) => a.zone.localeCompare(b.zone));
+  }, [filteredAlerts]);
+
+  const criticalCount = alerts.filter(a => a.severity === "critical").length;
+  const highCount = alerts.filter(a => a.severity === "high").length;
   const resolvedToday = 24;
   const avgResponseTime = "4.2 min";
 
-  const handleViewDetails = (alert: typeof activeAlerts[0]) => {
+  const handleViewDetails = (alert: AlertItem) => {
     setSelectedAlert(alert);
     setIsDetailOpen(true);
   };
@@ -314,7 +335,7 @@ export default function Alerts() {
     const csvContent = [
       ["ID", "Type", "Truck", "Driver", "Message", "Zone", "Severity", "Status", "Time"].join(","),
       ...filteredAlerts.map(alert => 
-        [alert.id, alert.type, alert.truck, alert.driver, `"${alert.message}"`, alert.zone, alert.severity, alert.status, alert.timestamp].join(",")
+        [alert.id || "", alert.type || "", alert.truck || "", alert.driver || "", `"${alert.message || ""}"`, alert.zone || "", alert.severity || "", alert.status || "", alert.timestamp || ""].join(",")
       )
     ].join("\n");
     
@@ -327,112 +348,111 @@ export default function Alerts() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Alerts & Violations</h1>
-          <p className="text-muted-foreground">Real-time monitoring of route deviations, missed pickups, and violations</p>
+    <div className="w-full h-full overflow-auto">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+        <PageHeader
+          category="Monitoring"
+          title="Alerts & Violations"
+          description="Real-time monitoring of route deviations, missed pickups, and violations"
+          icon={AlertTriangle}
+          badge={{
+            label: `${alerts.filter(a => a.status === "active").length} Active`,
+            className: "bg-destructive/10 text-destructive animate-pulse",
+          }}
+          actions={
+            <>
+              <Button variant="outline" size="sm" onClick={handleExportAlerts}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </>
+          }
+        />
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-4 border-l-4 border-l-destructive">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Critical Alerts</p>
+                <p className="text-2xl font-bold text-destructive">{criticalCount}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
+              <TrendingUp className="h-3 w-3" />
+              <span>+2 from last hour</span>
+            </div>
+          </Card>
+
+          <Card className="p-4 border-l-4 border-l-orange-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">High Priority</p>
+                <p className="text-2xl font-bold text-orange-500">{highCount}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                <Bell className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+              <TrendingDown className="h-3 w-3 text-emerald-500" />
+              <span>-3 from last hour</span>
+            </div>
+          </Card>
+
+          <Card className="p-4 border-l-4 border-l-emerald-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Resolved Today</p>
+                <p className="text-2xl font-bold text-emerald-500">{resolvedToday}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-emerald-500" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-emerald-500">
+              <TrendingUp className="h-3 w-3" />
+              <span>85% resolution rate</span>
+            </div>
+          </Card>
+
+          <Card className="p-4 border-l-4 border-l-blue-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Avg Response Time</p>
+                <p className="text-2xl font-bold text-blue-500">{avgResponseTime}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <Zap className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-emerald-500">
+              <TrendingDown className="h-3 w-3" />
+              <span>-30s improvement</span>
+            </div>
+          </Card>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 rounded-full animate-pulse">
-            <span className="h-2 w-2 bg-destructive rounded-full" />
-            <span className="text-sm font-medium text-destructive">{activeAlerts.filter(a => a.status === "active").length} Active</span>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleExportAlerts}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 border-l-4 border-l-destructive">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Critical Alerts</p>
-              <p className="text-2xl font-bold text-destructive">{criticalCount}</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-destructive" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
-            <TrendingUp className="h-3 w-3" />
-            <span>+2 from last hour</span>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-orange-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">High Priority</p>
-              <p className="text-2xl font-bold text-orange-500">{highCount}</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
-              <Bell className="h-6 w-6 text-orange-500" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <TrendingDown className="h-3 w-3 text-emerald-500" />
-            <span>-3 from last hour</span>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-emerald-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Resolved Today</p>
-              <p className="text-2xl font-bold text-emerald-500">{resolvedToday}</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle className="h-6 w-6 text-emerald-500" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs text-emerald-500">
-            <TrendingUp className="h-3 w-3" />
-            <span>85% resolution rate</span>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Avg Response Time</p>
-              <p className="text-2xl font-bold text-blue-500">{avgResponseTime}</p>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <Zap className="h-6 w-6 text-blue-500" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs text-emerald-500">
-            <TrendingDown className="h-3 w-3" />
-            <span>-30s improvement</span>
-          </div>
-        </Card>
-      </div>
-
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="live" className="space-y-4">
-        <TabsList className="bg-muted/50 p-1">
-          <TabsTrigger value="live" className="data-[state=active]:bg-background">
-            <Zap className="h-4 w-4 mr-2" />
-            Live Alerts
-          </TabsTrigger>
-          <TabsTrigger value="history" className="data-[state=active]:bg-background">
-            <Clock className="h-4 w-4 mr-2" />
-            Violation History
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-background">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Analytics
-          </TabsTrigger>
-        </TabsList>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="live" className="space-y-4">
+          <TabsList className="bg-muted/50 p-1">
+            <TabsTrigger value="live" className="data-[state=active]:bg-background">
+              <Zap className="h-4 w-4 mr-2" />
+              Live Alerts
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-background">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
 
         {/* Live Alerts Tab */}
         <TabsContent value="live" className="space-y-4">
@@ -449,13 +469,27 @@ export default function Alerts() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
+                <Input
+                  type="date"
+                  className="w-[140px]"
+                  value={selectedStartDate}
+                  onChange={(e) => setSelectedStartDate(e.target.value)}
+                  max={selectedEndDate}
+                />
+                <Input
+                  type="date"
+                  className="w-[140px]"
+                  value={selectedEndDate}
+                  onChange={(e) => setSelectedEndDate(e.target.value)}
+                  min={selectedStartDate}
+                />
                 <Select value={selectedType} onValueChange={setSelectedType}>
                   <SelectTrigger className="w-[160px]">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Alert Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {alertTypes.map((type) => (
+                    {alertTypeSelectOptions.map((type) => (
                       <SelectItem key={type.id} value={type.id}>
                         {type.label}
                       </SelectItem>
@@ -469,10 +503,11 @@ export default function Alerts() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Severity</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
+                    {severityOptions.map((severity) => (
+                      <SelectItem key={severity} value={severity}>
+                        {toTitleCase(severity)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
@@ -482,11 +517,25 @@ export default function Alerts() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Zones</SelectItem>
-                    <SelectItem value="Zone A">Zone A</SelectItem>
-                    <SelectItem value="Zone B">Zone B</SelectItem>
-                    <SelectItem value="Zone C">Zone C</SelectItem>
-                    <SelectItem value="Zone D">Zone D</SelectItem>
-                    <SelectItem value="Zone E">Zone E</SelectItem>
+                    {zoneOptions.map((zone) => (
+                      <SelectItem key={zone} value={zone}>
+                        {zone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedWard} onValueChange={setSelectedWard}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Ward" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Wards</SelectItem>
+                    {wardOptions.map((ward) => (
+                      <SelectItem key={ward} value={ward}>
+                        {ward}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -495,11 +544,11 @@ export default function Alerts() {
 
           {/* Alert Type Pills */}
           <div className="flex flex-wrap gap-2">
-            {alertTypes.map((type) => {
+            {alertTypeSelectOptions.map((type) => {
               const Icon = type.icon;
               const count = type.id === "all" 
-                ? activeAlerts.length 
-                : activeAlerts.filter(a => a.type === type.id).length;
+                ? alerts.length 
+                : alerts.filter(a => a.type === type.id).length;
               return (
                 <Button
                   key={type.id}
@@ -530,7 +579,7 @@ export default function Alerts() {
                   </div>
                 ) : (
                   filteredAlerts.map((alert) => {
-                    const Icon = getAlertIcon(alert.type);
+                    const Icon = getAlertIcon(alert.type || "");
                     return (
                       <Card
                         key={alert.id}
@@ -557,13 +606,17 @@ export default function Alerts() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-3 flex-wrap">
                                 <span className="font-semibold text-foreground flex items-center gap-1">
                                   <Truck className="h-4 w-4" />
                                   {alert.truck}
                                 </span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="text-sm text-muted-foreground">{alert.driver}</span>
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                  Route: {alert.route}
+                                </span>
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                                  {alert.zone} • {alert.ward}
+                                </span>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <Badge variant="outline" className={getSeverityColor(alert.severity)}>
@@ -574,15 +627,29 @@ export default function Alerts() {
                                 </Badge>
                               </div>
                             </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                              <span>{alert.driver}</span>
+                              <span>•</span>
+                              <Phone className="h-3 w-3" />
+                              <span>{alert.driverPhone}</span>
+                            </div>
                             <p className="text-sm text-foreground mb-2">{alert.message}</p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {alert.date}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {alert.time}
+                              </span>
                               <span className="flex items-center gap-1">
                                 <MapPin className="h-3 w-3" />
                                 {alert.zone}
                               </span>
                               <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {alert.time}
+                                <Shield className="h-3 w-3" />
+                                {alert.ward}
                               </span>
                             </div>
                           </div>
@@ -593,7 +660,7 @@ export default function Alerts() {
                               driverPhone={alert.driverPhone}
                               vendorName={alert.vendorName}
                               vendorPhone={alert.vendorPhone}
-                              alertType={alert.type.replace(/_/g, " ").toUpperCase()}
+                              alertType={(alert.type || "").replace(/_/g, " ").toUpperCase()}
                               alertMessage={alert.message}
                               size="sm"
                             />
@@ -608,68 +675,6 @@ export default function Alerts() {
                 )}
               </div>
             </ScrollArea>
-          </Card>
-        </TabsContent>
-
-        {/* Violation History Tab */}
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold">Violation Summary by Vehicle</h3>
-              <p className="text-sm text-muted-foreground">Track repeat offenders and violation patterns</p>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Truck</TableHead>
-                  <TableHead>Driver</TableHead>
-                  <TableHead>Violation Type</TableHead>
-                  <TableHead className="text-center">Count (30 days)</TableHead>
-                  <TableHead>Last Occurrence</TableHead>
-                  <TableHead>Trend</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {violationHistory.map((violation) => (
-                  <TableRow key={violation.id}>
-                    <TableCell className="font-medium">{violation.truck}</TableCell>
-                    <TableCell>{violation.driver}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{violation.type}</Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className={`font-semibold ${violation.count > 10 ? "text-destructive" : violation.count > 5 ? "text-warning" : "text-foreground"}`}>
-                        {violation.count}
-                      </span>
-                    </TableCell>
-                    <TableCell>{violation.lastOccurrence}</TableCell>
-                    <TableCell>
-                      {violation.trend === "up" && (
-                        <div className="flex items-center gap-1 text-destructive">
-                          <TrendingUp className="h-4 w-4" />
-                          <span className="text-xs">Increasing</span>
-                        </div>
-                      )}
-                      {violation.trend === "down" && (
-                        <div className="flex items-center gap-1 text-emerald-500">
-                          <TrendingDown className="h-4 w-4" />
-                          <span className="text-xs">Decreasing</span>
-                        </div>
-                      )}
-                      {violation.trend === "stable" && (
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <span className="text-xs">Stable</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">View Details</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </Card>
         </TabsContent>
 
@@ -770,7 +775,7 @@ export default function Alerts() {
               {selectedAlert && (
                 <>
                   {(() => {
-                    const Icon = getAlertIcon(selectedAlert.type);
+                    const Icon = getAlertIcon(selectedAlert.type || "");
                     return <Icon className="h-5 w-5 text-destructive" />;
                   })()}
                   Alert Details
@@ -789,17 +794,49 @@ export default function Alerts() {
                   <p className="font-semibold">{selectedAlert.truck}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-muted-foreground">Route</p>
+                  <p className="font-semibold">{selectedAlert.route}</p>
+                </div>
+                <div>
                   <p className="text-sm text-muted-foreground">Driver</p>
                   <p className="font-semibold">{selectedAlert.driver}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Driver Phone</p>
+                  <p className="font-semibold">{selectedAlert.driverPhone}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Zone</p>
                   <p className="font-semibold">{selectedAlert.zone}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-muted-foreground">Ward</p>
+                  <p className="font-semibold">{selectedAlert.ward}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-semibold flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    {selectedAlert.date}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Time</p>
+                  <p className="font-semibold flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {selectedAlert.time}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm text-muted-foreground">Severity</p>
                   <Badge variant="outline" className={getSeverityColor(selectedAlert.severity)}>
                     {selectedAlert.severity}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge variant="outline" className={getStatusColor(selectedAlert.status)}>
+                    {selectedAlert.status}
                   </Badge>
                 </div>
                 <div className="col-span-2">
@@ -834,7 +871,7 @@ export default function Alerts() {
                 driverPhone={selectedAlert.driverPhone}
                 vendorName={selectedAlert.vendorName}
                 vendorPhone={selectedAlert.vendorPhone}
-                alertType={selectedAlert.type.replace(/_/g, " ").toUpperCase()}
+                alertType={(selectedAlert.type || "").replace(/_/g, " ").toUpperCase()}
                 alertMessage={selectedAlert.message}
               />
             )}
@@ -849,6 +886,7 @@ export default function Alerts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

@@ -2,32 +2,15 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Truck, MapPin, Clock, ChevronRight, Gauge } from "lucide-react";
-import { trucksLive } from "@/data/trucks";
-import { routes } from "@/data/routes";
-import { zones } from "@/data/zones";
+import type { TruckData } from "@/data/fleetData";
 
 interface TruckListProps {
-  onSelectTruck: (truckId: string) => void;
-  selectedTruck: string | null;
+  onSelectTruck: (truck: TruckData) => void;
+  selectedTruck: TruckData | null;
+  trucks: TruckData[];
 }
 
-// Transform live truck data for display
-const trucks = trucksLive.filter(t => !t.isSpare).map(t => {
-  const route = routes.find(r => r.id === t.routeId);
-  const zone = zones.find(z => z.id === t.zoneId);
-  return {
-    id: t.id,
-    number: t.truckNumber,
-    driver: t.driver,
-    status: t.status,
-    route: route ? `${zone?.code || ''} - ${route.name}` : 'Unassigned',
-    trips: t.tripsCompleted,
-    speed: t.speed,
-    lastUpdate: t.lastUpdate,
-  };
-});
-
-const TruckList = ({ onSelectTruck, selectedTruck }: TruckListProps) => {
+const TruckList = ({ onSelectTruck, selectedTruck, trucks }: TruckListProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "moving":
@@ -87,18 +70,18 @@ const TruckList = ({ onSelectTruck, selectedTruck }: TruckListProps) => {
             <div
               key={truck.id}
               className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md ${
-                selectedTruck === truck.id
+                selectedTruck?.id === truck.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
                   : "border-border hover:border-primary/50 bg-card"
               }`}
-              onClick={() => onSelectTruck(truck.id)}
+              onClick={() => onSelectTruck(truck)}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${getStatusDot(truck.status)} ${truck.status === 'moving' ? 'animate-pulse' : ''}`} />
                   <div>
-                    <h3 className="font-semibold text-sm text-foreground">{truck.id}</h3>
-                    <p className="text-xs text-muted-foreground">{truck.number}</p>
+                    <h3 className="font-semibold text-sm text-foreground">{truck.truckNumber || truck.id}</h3>
+                    <p className="text-xs text-muted-foreground">{truck.id}</p>
                   </div>
                 </div>
                 <Badge className={`${getStatusColor(truck.status)} text-xs capitalize`} variant="outline">
@@ -109,11 +92,11 @@ const TruckList = ({ onSelectTruck, selectedTruck }: TruckListProps) => {
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-3 w-3" />
-                  <span className="truncate">{truck.route}</span>
+                  <span className="truncate">{truck.route || "Unassigned"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground truncate">
-                    {truck.driver}
+                    {truck.driver || "Unassigned"}
                   </span>
                   {truck.status === "moving" && (
                     <div className="flex items-center gap-1 text-success">
@@ -127,10 +110,10 @@ const TruckList = ({ onSelectTruck, selectedTruck }: TruckListProps) => {
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  {truck.lastUpdate}
+                  {truck.lastUpdate || "Just now"}
                 </div>
                 <div className="flex items-center gap-1 text-xs font-medium text-foreground">
-                  {truck.trips} trips
+                  {(truck.tripsCompleted ?? 0)} trips
                   <ChevronRight className="h-3 w-3 text-muted-foreground" />
                 </div>
               </div>

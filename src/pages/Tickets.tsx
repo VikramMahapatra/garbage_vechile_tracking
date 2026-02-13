@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,19 +12,54 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { mockTickets, Ticket, TicketStatus, TicketPriority, TicketCategory, TicketComment, defaultSLAConfig } from '@/data/masterData';
-import { Plus, Search, Clock, AlertTriangle, CheckCircle, MessageSquare, ArrowUpRight, Filter, Download, User, Calendar, Tag } from 'lucide-react';
+import { useTickets } from '@/hooks/useDataQueries';
+import type { Ticket, TicketStatus, TicketPriority, TicketCategory, TicketComment } from '@/data/tickets';
+import { slaConfig } from '@/data/tickets';
+import { PageHeader } from '@/components/PageHeader';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Clock, AlertTriangle, CheckCircle, MessageSquare, ArrowUpRight, Filter, Download, User, Calendar, Tag, Ticket as TicketIcon } from 'lucide-react';
 import { format, differenceInMinutes, parseISO } from 'date-fns';
+
+const getDateValue = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value : undefined;
+
+const safeParseISO = (value?: string) => (value ? parseISO(value) : null);
 
 export default function Tickets() {
   const { toast } = useToast();
-  const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
+  const { data: ticketsData = [], isLoading: isLoadingTickets, error: ticketsError } = useTickets();
+  
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [newComment, setNewComment] = useState('');
+
+  useEffect(() => {
+    const normalizedTickets = (ticketsData as any[]).map((ticket) => ({
+      id: ticket.id || ticket.ticket_number || 'UNKNOWN',
+      title: ticket.title || 'Untitled',
+      description: ticket.description || '',
+      category: ticket.category || 'complaint',
+      priority: ticket.priority || 'medium',
+      status: ticket.status || 'open',
+      createdAt: ticket.createdAt || ticket.created_at || new Date().toISOString(),
+      updatedAt: ticket.updatedAt || ticket.updated_at || new Date().toISOString(),
+      dueDate: ticket.dueDate || ticket.due_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      assignedTo: ticket.assignedTo || ticket.assigned_to || '',
+      createdBy: ticket.createdBy || ticket.reporter_name || 'System',
+      escalationLevel: ticket.escalationLevel ?? 0,
+      slaBreached: ticket.slaBreached ?? ticket.sla_breached ?? false,
+      comments: ticket.comments || [],
+    })) as Ticket[];
+
+    setTickets(normalizedTickets);
+    if (ticketsError) {
+      toast({ title: "Error", description: "Failed to load tickets", variant: "destructive" });
+    }
+  }, [ticketsData, ticketsError, toast]);
   
   const [formData, setFormData] = useState<Partial<Ticket>>({
     title: '',
@@ -61,13 +96,18 @@ export default function Tickets() {
   };
 
   const getSLAStatus = (ticket: Ticket) => {
-    const sla = defaultSLAConfig.find(s => s.priority === ticket.priority);
+    const sla = slaConfig.find(s => s.priority === ticket.priority);
     if (!sla) return null;
     
-    const createdAt = parseISO(ticket.createdAt);
+    const createdAt = safeParseISO(getDateValue(ticket.createdAt));
+    const dueDate = safeParseISO(getDateValue(ticket.dueDate));
     const now = new Date();
+
+    if (!createdAt || !dueDate) {
+      return <Badge className="bg-muted text-muted-foreground">Unknown SLA</Badge>;
+    }
+
     const minutesElapsed = differenceInMinutes(now, createdAt);
-    const dueDate = parseISO(ticket.dueDate);
     const isOverdue = now > dueDate;
     
     if (ticket.status === 'closed' || ticket.status === 'resolved') {
@@ -166,16 +206,17 @@ export default function Tickets() {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Ticket Management</h1>
-          <p className="text-muted-foreground">Track and manage service tickets with SLA monitoring</p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Create Ticket</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
+      <PageHeader
+        category="Support"
+        title="Ticket Management"
+        description="Track and manage service tickets with SLA monitoring"
+        icon={TicketIcon}
+        actions={
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" /> Create Ticket</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Create New Ticket</DialogTitle>
               <DialogDescription>Enter the ticket details</DialogDescription>
@@ -241,41 +282,96 @@ export default function Tickets() {
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
               <Button onClick={handleCreateTicket}>Create Ticket</Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-6">
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{ticketCounts.all}</div></CardContent>
+        <Card className="p-4 border-l-4 border-l-border">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold text-foreground">{ticketCounts.all}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-muted/30 flex items-center justify-center">
+                <Tag className="h-6 w-6 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
         </Card>
-        <Card className="bg-blue-500/10 border-blue-500/30">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-blue-600">Open</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-blue-600">{ticketCounts.open}</div></CardContent>
+        <Card className="p-4 border-l-4 border-l-blue-500">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Open</p>
+                <p className="text-2xl font-bold text-blue-600">{ticketCounts.open}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
         </Card>
-        <Card className="bg-primary/10 border-primary/30">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-primary">In Progress</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-primary">{ticketCounts.in_progress}</div></CardContent>
+        <Card className="p-4 border-l-4 border-l-primary">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">In Progress</p>
+                <p className="text-2xl font-bold text-primary">{ticketCounts.in_progress}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
         </Card>
-        <Card className="bg-warning/10 border-warning/30">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-warning">Pending</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-warning">{ticketCounts.pending}</div></CardContent>
+        <Card className="p-4 border-l-4 border-l-warning">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold text-warning">{ticketCounts.pending}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
+                <User className="h-6 w-6 text-warning" />
+              </div>
+            </div>
+          </CardContent>
         </Card>
-        <Card className="bg-success/10 border-success/30">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-success">Resolved</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-success">{ticketCounts.resolved}</div></CardContent>
+        <Card className="p-4 border-l-4 border-l-success">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Resolved</p>
+                <p className="text-2xl font-bold text-success">{ticketCounts.resolved}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-success" />
+              </div>
+            </div>
+          </CardContent>
         </Card>
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-destructive">SLA Breached</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-destructive">{ticketCounts.breached}</div></CardContent>
+        <Card className="p-4 border-l-4 border-l-destructive">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">SLA Breached</p>
+                <p className="text-2xl font-bold text-destructive">{ticketCounts.breached}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              </div>
+            </div>
+          </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="bg-card/50 border-border/50">
-        <CardContent className="pt-6">
+      <Card className="p-4">
+        <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -308,7 +404,7 @@ export default function Tickets() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Ticket List */}
-        <Card className="lg:col-span-2 bg-card/50 border-border/50">
+        <Card className="lg:col-span-2 p-4">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -347,11 +443,11 @@ export default function Tickets() {
         </Card>
 
         {/* Ticket Details */}
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader className="pb-3">
+        <Card className="p-4">
+          <CardHeader className="p-0 pb-3">
             <CardTitle className="text-lg">Ticket Details</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {selectedTicket ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -403,7 +499,11 @@ export default function Tickets() {
                         <div key={comment.id} className="text-sm p-2 bg-muted/50 rounded-lg">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium">{comment.author}</span>
-                            <span className="text-xs text-muted-foreground">{format(parseISO(comment.createdAt), 'MMM d, HH:mm')}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {comment.createdAt
+                                ? format(parseISO(comment.createdAt), 'MMM d, HH:mm')
+                                : 'Unknown'}
+                            </span>
                           </div>
                           <p className="text-muted-foreground">{comment.content}</p>
                         </div>

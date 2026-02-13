@@ -9,14 +9,38 @@ from ..schemas import schemas
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
-@router.get("/", response_model=List[schemas.Alert])
+def _serialize_alert_with_names(
+    alert: models.Alert,
+    registration_number: str = None,
+    route_name: str = None,
+    zone_name: str = None,
+    ward_name: str = None,
+):
+    data = alert.__dict__.copy()
+    data.pop("_sa_instance_state", None)
+    data["truck_registration_number"] = registration_number
+    data["route_name"] = route_name
+    data["zone_name"] = zone_name
+    data["ward_name"] = ward_name
+    return data
+
+@router.get("/", response_model=List[schemas.AlertWithNames])
 def get_alerts(
     status: str = None,
     severity: str = None,
     truck_id: str = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(models.Alert)
+    query = db.query(
+        models.Alert,
+        models.Truck.registration_number,
+        models.Route.name,
+        models.Zone.name,
+        models.Ward.name,
+    ).outerjoin(models.Truck, models.Alert.truck_id == models.Truck.id)
+    query = query.outerjoin(models.Route, models.Alert.route_id == models.Route.id)
+    query = query.outerjoin(models.Zone, models.Alert.zone_id == models.Zone.id)
+    query = query.outerjoin(models.Ward, models.Alert.ward_id == models.Ward.id)
     
     if status:
         query = query.filter(models.Alert.status == status)
@@ -26,7 +50,10 @@ def get_alerts(
         query = query.filter(models.Alert.truck_id == truck_id)
     
     alerts = query.order_by(models.Alert.timestamp.desc()).all()
-    return alerts
+    return [
+        _serialize_alert_with_names(alert, registration_number, route_name, zone_name, ward_name)
+        for alert, registration_number, route_name, zone_name, ward_name in alerts
+    ]
 
 @router.post("/", response_model=schemas.Alert)
 def create_alert(alert: schemas.AlertCreate, db: Session = Depends(get_db)):
@@ -36,13 +63,24 @@ def create_alert(alert: schemas.AlertCreate, db: Session = Depends(get_db)):
     db.refresh(db_alert)
     return db_alert
 
-@router.get("/active", response_model=List[schemas.Alert])
+@router.get("/active", response_model=List[schemas.AlertWithNames])
 def get_active_alerts(db: Session = Depends(get_db)):
     """Get all active alerts"""
-    alerts = db.query(models.Alert).filter(
-        models.Alert.status == "active"
-    ).order_by(models.Alert.timestamp.desc()).all()
-    return alerts
+    alerts = db.query(
+        models.Alert,
+        models.Truck.registration_number,
+        models.Route.name,
+        models.Zone.name,
+        models.Ward.name,
+    ).outerjoin(models.Truck, models.Alert.truck_id == models.Truck.id)
+    alerts = alerts.outerjoin(models.Route, models.Alert.route_id == models.Route.id)
+    alerts = alerts.outerjoin(models.Zone, models.Alert.zone_id == models.Zone.id)
+    alerts = alerts.outerjoin(models.Ward, models.Alert.ward_id == models.Ward.id)
+    alerts = alerts.filter(models.Alert.status == "active").order_by(models.Alert.timestamp.desc()).all()
+    return [
+        _serialize_alert_with_names(alert, registration_number, route_name, zone_name, ward_name)
+        for alert, registration_number, route_name, zone_name, ward_name in alerts
+    ]
 
 @router.get("/expiry", response_model=dict)
 def get_expiry_alerts(db: Session = Depends(get_db)):

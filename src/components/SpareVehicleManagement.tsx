@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,8 +30,10 @@ import {
   Wrench,
   Clock
 } from "lucide-react";
-import { trucks as fleetTrucks, TruckData, TruckStatus } from "@/data/fleetData";
-import { mockVendors, mockZones, mockWards } from "@/data/masterData";
+import { TruckData, TruckStatus } from "@/data/fleetData";
+import { Vendor, Zone, Ward } from "@/data/masterData";
+import { apiService } from "@/services/api";
+import { useDrivers, useRoutes, useTrucks, useVendors, useZones } from "@/hooks/useDataQueries";
 
 interface SpareAssignment {
   breakdownTruckId: string;
@@ -43,12 +45,116 @@ interface SpareAssignment {
 
 export function SpareVehicleManagement() {
   const { toast } = useToast();
-  const [trucksData, setTrucksData] = useState<TruckData[]>(fleetTrucks);
+  
+  // API Hooks
+  const { data: vendorsData = [] } = useVendors();
+  const { data: zonesData = [] } = useZones();
+  const { data: trucksApiData = [] } = useTrucks();
+  const { data: routesData = [] } = useRoutes();
+  const { data: driversData = [] } = useDrivers();
+  
+  // State for API data
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
+  
+  // Sync API data to state
+  useEffect(() => {
+    if (vendorsData.length === 0) return;
+    const normalizedVendors = (vendorsData as any[]).map((vendor) => ({
+      ...vendor,
+      companyName: vendor.companyName ?? vendor.company_name ?? vendor.name,
+    }));
+    setVendors(normalizedVendors);
+  }, [vendorsData]);
+
+  useEffect(() => {
+    if (zonesData.length === 0) return;
+    const normalizedZones = (zonesData as any[]).map((zone) => ({
+      ...zone,
+      totalWards: zone.totalWards ?? zone.total_wards,
+      supervisorName: zone.supervisorName ?? zone.supervisor_name,
+      supervisorPhone: zone.supervisorPhone ?? zone.supervisor_phone,
+    }));
+    setZones(normalizedZones);
+  }, [zonesData]);
+
+  useEffect(() => {
+    if (zonesData.length === 0) return;
+    const loadAllWards = async () => {
+      const wardBatches = await Promise.all(
+        (zonesData as any[]).map((zone) => apiService.getZoneWards(zone.id))
+      );
+      const flattened = wardBatches.flat();
+      const normalizedWards = flattened.map((ward: any) => ({
+        ...ward,
+        zoneId: ward.zoneId ?? ward.zone_id,
+        totalPickupPoints: ward.totalPickupPoints ?? ward.total_pickup_points,
+      }));
+      const uniqueById = Array.from(
+        new Map(normalizedWards.map((ward: any) => [ward.id, ward])).values()
+      );
+      setWards(uniqueById);
+    };
+
+    loadAllWards();
+  }, [zonesData]);
+
+  const [trucksData, setTrucksData] = useState<TruckData[]>([]);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedBreakdownTruck, setSelectedBreakdownTruck] = useState<TruckData | null>(null);
   const [selectedSpareTruck, setSelectedSpareTruck] = useState<string>("");
   const [breakdownReason, setBreakdownReason] = useState("");
   const [spareAssignments, setSpareAssignments] = useState<SpareAssignment[]>([]);
+
+  const normalizedTrucks = useMemo(() => {
+    const routesById = new Map((routesData as any[]).map((route) => [route.id, route]));
+    const driversById = new Map((driversData as any[]).map((driver) => [driver.id, driver]));
+
+    return (trucksApiData as any[]).map((truck) => {
+      const route = routesById.get(truck.assigned_route_id);
+      const driver = driversById.get(truck.driver_id);
+      const currentStatus = truck.current_status || truck.currentStatus || "idle";
+
+      return {
+        id: truck.id,
+        truckNumber: truck.registration_number || truck.registrationNumber || truck.id,
+        truckType: truck.route_type || truck.routeType || "primary",
+        vehicleType: truck.type || "compactor",
+        position: {
+          lat: truck.latitude ?? 0,
+          lng: truck.longitude ?? 0,
+        },
+        status: currentStatus,
+        driver: driver?.name || "Unassigned",
+        driverId: truck.driver_id || "-",
+        route: route?.name || "Unassigned",
+        routeId: truck.assigned_route_id || "",
+        speed: truck.speed ?? 0,
+        assignedGTP: undefined,
+        assignedDumpingSite: undefined,
+        tripsCompleted: truck.trips_completed ?? 0,
+        tripsAllowed: truck.trips_allowed ?? 5,
+        gpsDevice: {
+          imei: truck.imei_number || "-",
+          status: "offline",
+          lastPing: "-",
+          signalStrength: 0,
+          batteryLevel: 0,
+        },
+        vehicleCapacity: truck.capacity ? `${truck.capacity} ${truck.capacity_unit || ""}`.trim() : "-",
+        lastUpdate: truck.last_update || "-",
+        vendorId: truck.vendor_id || "",
+        zoneId: truck.zone_id || "",
+        wardId: truck.ward_id || "",
+        isSpare: truck.is_spare ?? false,
+      } as TruckData;
+    });
+  }, [trucksApiData, routesData, driversData]);
+
+  useEffect(() => {
+    setTrucksData(normalizedTrucks);
+  }, [normalizedTrucks]);
   
   // Filters for breakdown table
   const [brkZoneFilter, setBrkZoneFilter] = useState("all");
@@ -57,8 +163,8 @@ export function SpareVehicleManagement() {
   const [brkRouteTypeFilter, setBrkRouteTypeFilter] = useState("all");
 
   const filteredWards = brkZoneFilter !== "all" 
-    ? mockWards.filter(w => w.zoneId === brkZoneFilter) 
-    : mockWards;
+    ? wards.filter(w => w.zoneId === brkZoneFilter) 
+    : wards;
 
   // Get breakdown trucks
   const breakdownTrucks = trucksData.filter(t => t.status === "breakdown" && !t.replacedBySpareId);
@@ -73,7 +179,7 @@ export function SpareVehicleManagement() {
   const allSpareTrucks = trucksData.filter(t => t.isSpare);
 
   // Calculate vendor spare truck requirements
-  const vendorSpareStatus = mockVendors.map(vendor => {
+  const vendorSpareStatus = vendors.map(vendor => {
     const vendorTrucks = trucksData.filter(t => t.vendorId === vendor.id && !t.isSpare);
     const vendorSpares = trucksData.filter(t => t.vendorId === vendor.id && t.isSpare);
     const spareTruckPercentage = parseInt(localStorage.getItem('spareTruckPercentage') || '10');
@@ -119,7 +225,7 @@ export function SpareVehicleManagement() {
           replacingTruckId: selectedBreakdownTruck.id,
           route: selectedBreakdownTruck.route,
           routeId: selectedBreakdownTruck.routeId,
-          assignedGCP: selectedBreakdownTruck.assignedGCP,
+          assignedGTP: selectedBreakdownTruck.assignedGTP,
           assignedDumpingSite: selectedBreakdownTruck.assignedDumpingSite,
           status: "moving" as TruckStatus
         };
@@ -158,7 +264,7 @@ export function SpareVehicleManagement() {
           replacingTruckId: undefined,
           route: "Unassigned",
           routeId: "",
-          assignedGCP: undefined,
+          assignedGTP: undefined,
           assignedDumpingSite: truck.truckType === "secondary" ? truck.assignedDumpingSite : undefined,
           status: "idle" as TruckStatus
         };
@@ -190,48 +296,60 @@ export function SpareVehicleManagement() {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spare Trucks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{allSpareTrucks.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Available in fleet</p>
-          </CardContent>
+        <Card className="p-4 border-l-4 border-l-primary">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Spare Trucks</p>
+              <p className="text-2xl font-bold text-foreground">{allSpareTrucks.length}</p>
+            </div>
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Truck className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">Available in fleet</div>
         </Card>
-        <Card className="bg-success/10 border-success/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-success">Available Spares</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{availableSpares.length}</div>
-            <p className="text-xs text-success/80 mt-1">Ready for deployment</p>
-          </CardContent>
+        <Card className="p-4 border-l-4 border-l-success">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Available Spares</p>
+              <p className="text-2xl font-bold text-success">{availableSpares.length}</p>
+            </div>
+            <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
+              <CheckCircle className="h-6 w-6 text-success" />
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-success/80">Ready for deployment</div>
         </Card>
-        <Card className="bg-warning/10 border-warning/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-warning">Active Replacements</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{activeReplacements.length}</div>
-            <p className="text-xs text-warning/80 mt-1">Currently on routes</p>
-          </CardContent>
+        <Card className="p-4 border-l-4 border-l-warning">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Active Replacements</p>
+              <p className="text-2xl font-bold text-warning">{activeReplacements.length}</p>
+            </div>
+            <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
+              <ArrowRightLeft className="h-6 w-6 text-warning" />
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-warning/80">Currently on routes</div>
         </Card>
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-destructive">Breakdown Trucks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{breakdownTrucks.length}</div>
-            <p className="text-xs text-destructive/80 mt-1">Awaiting repair</p>
-          </CardContent>
+        <Card className="p-4 border-l-4 border-l-destructive">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Breakdown Trucks</p>
+              <p className="text-2xl font-bold text-destructive">{breakdownTrucks.length}</p>
+            </div>
+            <div className="h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-destructive/80">Awaiting repair</div>
         </Card>
       </div>
 
       {/* Vendor Compliance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="p-4">
+        <CardHeader className="p-0 pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
             <Truck className="h-5 w-5" />
             Vendor Spare Truck Compliance
           </CardTitle>
@@ -239,7 +357,7 @@ export function SpareVehicleManagement() {
             Each vendor must maintain {localStorage.getItem('spareTruckPercentage') || '10'}% of their fleet as spare trucks
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -280,9 +398,9 @@ export function SpareVehicleManagement() {
       </Card>
 
       {/* Active Truck List with Breakdown Option */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="p-4">
+        <CardHeader className="p-0 pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
             <Wrench className="h-5 w-5" />
             Mark Truck as Breakdown
           </CardTitle>
@@ -290,14 +408,14 @@ export function SpareVehicleManagement() {
             Select a truck to mark as breakdown and assign a spare
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {/* Filters */}
           <div className="grid gap-3 md:grid-cols-4 mb-4">
             <Select value={brkZoneFilter} onValueChange={(v) => { setBrkZoneFilter(v); setBrkWardFilter("all"); }}>
               <SelectTrigger><SelectValue placeholder="Zone" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Zones</SelectItem>
-                {mockZones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}
+                {zones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={brkWardFilter} onValueChange={setBrkWardFilter}>
@@ -311,7 +429,7 @@ export function SpareVehicleManagement() {
               <SelectTrigger><SelectValue placeholder="Vendor" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Vendors</SelectItem>
-                {mockVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.companyName}</SelectItem>)}
+                {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.companyName}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={brkRouteTypeFilter} onValueChange={setBrkRouteTypeFilter}>
@@ -346,8 +464,8 @@ export function SpareVehicleManagement() {
                 .filter(t => brkRouteTypeFilter === "all" || t.truckType === brkRouteTypeFilter)
                 .slice(0, 20)
                 .map((truck) => {
-                  const zone = mockZones.find(z => z.id === truck.zoneId);
-                  const ward = mockWards.find(w => w.id === truck.wardId);
+                  const zone = zones.find(z => z.id === truck.zoneId);
+                  const ward = wards.find(w => w.id === truck.wardId);
                   return (
                     <TableRow key={truck.id}>
                       <TableCell className="font-medium">{truck.truckNumber}</TableCell>
@@ -387,9 +505,9 @@ export function SpareVehicleManagement() {
 
       {/* Active Spare Assignments */}
       {activeReplacements.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="p-4">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
               <ArrowRightLeft className="h-5 w-5" />
               Active Spare Assignments
               <Badge variant="secondary">{activeReplacements.length}</Badge>
@@ -398,7 +516,7 @@ export function SpareVehicleManagement() {
               Spare trucks currently replacing breakdown vehicles
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>

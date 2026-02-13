@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/pagination";
 import { ArrowLeft, Search, Download, AlertTriangle, Clock, MapPin, Navigation, Gauge, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { PageHeader } from "@/components/PageHeader";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -134,21 +135,23 @@ const ActiveAlertsDetail = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Active Alerts</h1>
-            <p className="text-muted-foreground text-sm">All current alerts requiring attention</p>
-          </div>
-        </div>
-        <Button variant="outline" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        category="Monitoring"
+        title="Active Alerts"
+        description="All current alerts requiring attention and immediate action"
+        icon={AlertTriangle}
+        actions={
+          <>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="p-4 border-l-4 border-l-warning">

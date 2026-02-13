@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,16 +8,35 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockVendors, Vendor } from '@/data/masterData';
-import { Plus, Search, Edit, Trash2, Phone, Mail, Building2, Download, Truck } from 'lucide-react';
+import { useVendors } from '@/hooks/useDataQueries';
+import { Vendor } from '@/data/masterData';
+import { Plus, Search, Edit, Trash2, Phone, Mail, Building2, Download, Truck, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 export default function MasterVendors() {
   const { toast } = useToast();
-  const [vendors, setVendors] = useState<Vendor[]>(mockVendors);
+  const { data: vendorsData = [], isLoading: isLoadingVendors } = useVendors();
+  
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+
+  useEffect(() => {
+    const normalizedVendors = (vendorsData as any[]).map((vendor) => ({
+      ...vendor,
+      companyName: vendor.companyName || vendor.company_name,
+      gstNumber: vendor.gstNumber || vendor.gst_number,
+      contractStart: vendor.contractStart || vendor.contract_start,
+      contractEnd: vendor.contractEnd || vendor.contract_end,
+      supervisorName: vendor.supervisorName || vendor.supervisor_name,
+      supervisorPhone: vendor.supervisorPhone || vendor.supervisor_phone,
+      trucksOwned: vendor.trucksOwned || [],
+    })) as Vendor[];
+
+    setVendors(normalizedVendors);
+  }, [vendorsData]);
   
   const [formData, setFormData] = useState<Partial<Vendor>>({
     name: '',
@@ -35,9 +54,12 @@ export default function MasterVendors() {
   });
 
   const filteredVendors = vendors.filter(vendor => {
-    const matchesSearch = vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         vendor.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         vendor.phone.includes(searchQuery);
+    const name = (vendor.name || "").toLowerCase();
+    const companyName = (vendor.companyName || "").toLowerCase();
+    const phone = vendor.phone || "";
+    const matchesSearch = name.includes(searchQuery.toLowerCase()) ||
+                         companyName.includes(searchQuery.toLowerCase()) ||
+                         phone.includes(searchQuery);
     const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -86,7 +108,7 @@ export default function MasterVendors() {
 
   const exportToCSV = () => {
     const headers = ['ID', 'Name', 'Company', 'Phone', 'Email', 'GST Number', 'Contract Start', 'Contract End', 'Status', 'Trucks Owned'];
-    const rows = filteredVendors.map(v => [v.id, v.name, v.companyName, v.phone, v.email, v.gstNumber, v.contractStart, v.contractEnd, v.status, v.trucksOwned.length]);
+    const rows = filteredVendors.map(v => [v.id, v.name || '', v.companyName || v.name || '', v.phone || '', v.email || '', v.gstNumber || '', v.contractStart || '', v.contractEnd || '', v.status || '', v.trucksOwned?.length || 0]);
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -98,19 +120,20 @@ export default function MasterVendors() {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Vendor Management</h1>
-          <p className="text-muted-foreground">Manage vendor contracts and information</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" /> Export
-          </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsAddDialogOpen(open); }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add Vendor</Button>
-            </DialogTrigger>
+      <PageHeader
+        category="Master Data"
+        title="Vendor Management"
+        description="Manage vendor contracts, information, and service agreements"
+        icon={Building2}
+        actions={
+          <>
+            <Button variant="outline" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsAddDialogOpen(open); }}>
+              <DialogTrigger asChild>
+                <Button><Plus className="h-4 w-4 mr-2" /> Add Vendor</Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>{editingVendor ? 'Edit Vendor' : 'Add New Vendor'}</DialogTitle>
@@ -185,8 +208,9 @@ export default function MasterVendors() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -219,7 +243,7 @@ export default function MasterVendors() {
             <CardTitle className="text-sm font-medium text-primary">Total Trucks</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{vendors.reduce((acc, v) => acc + v.trucksOwned.length, 0)}</div>
+            <div className="text-2xl font-bold text-primary">{vendors.reduce((acc, v) => acc + (v.trucksOwned?.length || 0), 0)}</div>
           </CardContent>
         </Card>
       </div>
@@ -268,8 +292,8 @@ export default function MasterVendors() {
                         <Building2 className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <div className="font-medium">{vendor.companyName}</div>
-                        <div className="text-sm text-muted-foreground">{vendor.name}</div>
+                        <div className="font-medium">{vendor.companyName || vendor.name}</div>
+                        <div className="text-sm text-muted-foreground">{vendor.companyName ? vendor.name : 'Company name not set'}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -286,7 +310,7 @@ export default function MasterVendors() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Truck className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{vendor.trucksOwned.length}</span>
+                      <span className="font-medium">{vendor.trucksOwned?.length || 0}</span>
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(vendor.status)}</TableCell>

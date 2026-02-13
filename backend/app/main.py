@@ -7,7 +7,7 @@ from datetime import datetime
 
 from .database.database import engine, SessionLocal
 from .models import models
-from .routers import zones, trucks, vendors, routes, pickup_points, alerts, reports
+from .routers import zones, trucks, vendors, routes, pickup_points, alerts, reports, drivers, gtc_checkpoints
 from .services.vehicle_simulator import vehicle_simulator
 
 # Create database tables
@@ -94,7 +94,10 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,10 +107,12 @@ app.add_middleware(
 app.include_router(zones.router, prefix="/api")
 app.include_router(trucks.router, prefix="/api")
 app.include_router(vendors.router, prefix="/api")
+app.include_router(drivers.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(pickup_points.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(gtc_checkpoints.router, prefix="/api")
 
 # Import new routers
 from .routers import auth, tickets, social_media, analytics

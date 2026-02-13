@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,16 +8,34 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockDrivers, mockTrucks, Driver } from '@/data/masterData';
-import { Plus, Search, Edit, Trash2, Phone, Mail, User, Download } from 'lucide-react';
+import { useDrivers, useTrucks } from '@/hooks/useDataQueries';
+import { Driver } from '@/data/masterData';
+import { Plus, Search, Edit, Trash2, Phone, Mail, User, Download, Loader2, UserCheck } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 export default function MasterDrivers() {
   const { toast } = useToast();
-  const [drivers, setDrivers] = useState<Driver[]>(mockDrivers);
+  
+  // Fetch drivers from API
+  const { data: driversFromAPI = [], isLoading: isLoadingDrivers, error: driversError } = useDrivers();
+  const { data: trucksFromAPI = [], isLoading: isLoadingTrucks } = useTrucks();
+  
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [trucks, setTrucks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  
+  // Initialize drivers from API
+  useEffect(() => {
+    setDrivers(driversFromAPI);
+  }, [driversFromAPI]);
+
+  // Initialize trucks from API
+  useEffect(() => {
+    setTrucks(trucksFromAPI);
+  }, [trucksFromAPI]);
   
   const [formData, setFormData] = useState<Partial<Driver>>({
     name: '',
@@ -49,7 +67,7 @@ export default function MasterDrivers() {
 
   const getTruckInfo = (truckId?: string) => {
     if (!truckId) return 'Not Assigned';
-    const truck = mockTrucks.find(t => t.id === truckId);
+    const truck = trucks.find(t => t.id === truckId);
     return truck ? truck.registrationNumber : 'Unknown';
   };
 
@@ -100,19 +118,20 @@ export default function MasterDrivers() {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Driver Management</h1>
-          <p className="text-muted-foreground">Manage driver information and assignments</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" /> Export
-          </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsAddDialogOpen(open); }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add Driver</Button>
-            </DialogTrigger>
+      <PageHeader
+        category="Master Data"
+        title="Driver Management"
+        description="Manage driver information, assignments, and licensing"
+        icon={UserCheck}
+        actions={
+          <>
+            <Button variant="outline" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsAddDialogOpen(open); }}>
+              <DialogTrigger asChild>
+                <Button><Plus className="h-4 w-4 mr-2" /> Add Driver</Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
@@ -173,8 +192,9 @@ export default function MasterDrivers() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">

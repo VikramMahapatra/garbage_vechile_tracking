@@ -50,6 +50,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { PageHeader } from "@/components/PageHeader";
 
 // AI Predictions Data
 const pickupDemandPredictions = [

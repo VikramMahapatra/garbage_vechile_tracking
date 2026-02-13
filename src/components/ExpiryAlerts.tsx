@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import {
   User,
   FileWarning
 } from "lucide-react";
-import { mockTrucks, mockDrivers } from "@/data/masterData";
+import { useTrucks, useDrivers } from "@/hooks/useDataQueries";
 import { differenceInDays, parseISO, format } from "date-fns";
 
 interface ExpiryItem {
@@ -36,50 +36,59 @@ const getExpiryStatus = (daysLeft: number): 'expired' | 'critical' | 'warning' |
   return 'ok';
 };
 
-const getExpiryItems = (): ExpiryItem[] => {
+const getExpiryItems = (trucks: any[], drivers: any[]): ExpiryItem[] => {
   const items: ExpiryItem[] = [];
   const today = new Date();
 
-  mockTrucks.forEach(truck => {
-    const daysLeft = differenceInDays(parseISO(truck.insuranceExpiry), today);
-    items.push({
-      id: `insurance-${truck.id}`,
-      name: truck.registrationNumber,
-      type: 'insurance',
-      expiryDate: truck.insuranceExpiry,
-      daysLeft,
-      status: getExpiryStatus(daysLeft),
-      entity: 'truck',
-      entityId: truck.id
-    });
+  trucks.forEach(truck => {
+    // Only process if insuranceExpiry exists
+    if (truck.insuranceExpiry) {
+      const daysLeft = differenceInDays(parseISO(truck.insuranceExpiry), today);
+      items.push({
+        id: `insurance-${truck.id}`,
+        name: truck.registrationNumber,
+        type: 'insurance',
+        expiryDate: truck.insuranceExpiry,
+        daysLeft,
+        status: getExpiryStatus(daysLeft),
+        entity: 'truck',
+        entityId: truck.id
+      });
+    }
   });
 
-  mockTrucks.forEach(truck => {
-    const daysLeft = differenceInDays(parseISO(truck.fitnessExpiry), today);
-    items.push({
-      id: `fitness-${truck.id}`,
-      name: truck.registrationNumber,
-      type: 'fitness',
-      expiryDate: truck.fitnessExpiry,
-      daysLeft,
-      status: getExpiryStatus(daysLeft),
-      entity: 'truck',
-      entityId: truck.id
-    });
+  trucks.forEach(truck => {
+    // Only process if fitnessExpiry exists
+    if (truck.fitnessExpiry) {
+      const daysLeft = differenceInDays(parseISO(truck.fitnessExpiry), today);
+      items.push({
+        id: `fitness-${truck.id}`,
+        name: truck.registrationNumber,
+        type: 'fitness',
+        expiryDate: truck.fitnessExpiry,
+        daysLeft,
+        status: getExpiryStatus(daysLeft),
+        entity: 'truck',
+        entityId: truck.id
+      });
+    }
   });
 
-  mockDrivers.forEach(driver => {
-    const daysLeft = differenceInDays(parseISO(driver.licenseExpiry), today);
-    items.push({
-      id: `license-${driver.id}`,
-      name: driver.name,
-      type: 'license',
-      expiryDate: driver.licenseExpiry,
-      daysLeft,
-      status: getExpiryStatus(daysLeft),
-      entity: 'driver',
-      entityId: driver.id
-    });
+  drivers.forEach(driver => {
+    // Only process if licenseExpiry exists
+    if (driver.licenseExpiry) {
+      const daysLeft = differenceInDays(parseISO(driver.licenseExpiry), today);
+      items.push({
+        id: `license-${driver.id}`,
+        name: driver.name,
+        type: 'license',
+        expiryDate: driver.licenseExpiry,
+        daysLeft,
+        status: getExpiryStatus(daysLeft),
+        entity: 'driver',
+        entityId: driver.id
+      });
+    }
   });
 
   return items.sort((a, b) => a.daysLeft - b.daysLeft);
@@ -88,7 +97,25 @@ const getExpiryItems = (): ExpiryItem[] => {
 const ExpiryAlerts = () => {
   const [activeTab, setActiveTab] = useState("all");
   const navigate = useNavigate();
-  const expiryItems = getExpiryItems();
+  
+  // API Hooks
+  const { data: trucksData = [] } = useTrucks();
+  const { data: driversData = [] } = useDrivers();
+  
+  // State for API data
+  const [trucks, setTrucks] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  
+  // Sync API data to state
+  useEffect(() => {
+    setTrucks(trucksData);
+  }, [trucksData]);
+  
+  useEffect(() => {
+    setDrivers(driversData);
+  }, [driversData]);
+  
+  const expiryItems = getExpiryItems(trucks, drivers);
 
   const allFilteredItems = expiryItems.filter(item => {
     if (activeTab === "all") return item.status !== 'ok';
@@ -161,7 +188,7 @@ const ExpiryAlerts = () => {
       
       <CardContent className="p-0 flex-1 flex flex-col">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="px-3 py-2 border-b border-border">
+          <div className="px-4 py-2 border-b border-border">
             <TabsList className="grid w-full grid-cols-4 h-8">
               <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
               <TabsTrigger value="insurance" className="text-xs">Insurance</TabsTrigger>
@@ -171,7 +198,7 @@ const ExpiryAlerts = () => {
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="p-3 space-y-2">
+            <div className="p-4 space-y-3">
               {filteredItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -183,7 +210,7 @@ const ExpiryAlerts = () => {
                   return (
                     <div 
                       key={item.id}
-                      className={`p-3 rounded-lg border ${styles.border} ${styles.bg} transition-all hover:shadow-sm`}
+                      className={`p-4 rounded-lg border ${styles.border} ${styles.bg} transition-all hover:shadow-sm`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">

@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -68,7 +70,7 @@ class DriverBase(BaseModel):
     name: str
     phone: Optional[str] = None
     license_number: Optional[str] = None
-    license_expiry: Optional[str] = None
+    license_expiry: Optional[str] = Field(None, serialization_alias="licenseExpiry")
     vendor_id: str
     status: str = "active"
 
@@ -80,6 +82,7 @@ class Driver(DriverBase):
     
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # Truck Schemas
 class TruckBase(BaseModel):
@@ -93,17 +96,20 @@ class TruckBase(BaseModel):
     imei_number: str
     fuel_type: str
     manufacturing_year: int
-    insurance_expiry: str
-    fitness_expiry: str
+    insurance_expiry: str = Field(..., serialization_alias="insuranceExpiry")
+    fitness_expiry: str = Field(..., serialization_alias="fitnessExpiry")
     status: str = "active"
     last_service_date: Optional[str] = None
     is_spare: bool = False
-    zone_id: str
-    ward_id: str
+    zone_id: Optional[str] = None
+    ward_id: Optional[str] = None
     assigned_route_id: Optional[str] = None
 
 class TruckCreate(TruckBase):
     id: str
+
+class TruckAssignRoute(BaseModel):
+    assigned_route_id: Optional[str] = None
 
 class TruckLive(BaseModel):
     id: str
@@ -119,8 +125,8 @@ class TruckLive(BaseModel):
     driver_name: Optional[str] = None
     route_name: Optional[str] = None
     vendor_id: str
-    zone_id: str
-    ward_id: str
+    zone_id: Optional[str] = None
+    ward_id: Optional[str] = None
     is_spare: bool = False
     last_update: Optional[datetime] = None
     
@@ -139,6 +145,7 @@ class Truck(TruckBase):
     
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # Route Schemas
 class RouteBase(BaseModel):
@@ -157,6 +164,7 @@ class RouteCreate(RouteBase):
 
 class Route(RouteBase):
     id: str
+    pickup_points: List = []
     
     class Config:
         from_attributes = True
@@ -190,9 +198,14 @@ class PickupPoint(PickupPointBase):
 # Alert Schemas
 class AlertBase(BaseModel):
     truck_id: str
+    route_id: Optional[str] = None
+    zone_id: Optional[str] = None
+    ward_id: Optional[str] = None
     alert_type: str
     severity: str
     message: str
+    location: Optional[str] = None
+    date: Optional[str] = None
     status: str = "active"
 
 class AlertCreate(AlertBase):
@@ -205,6 +218,14 @@ class Alert(AlertBase):
     
     class Config:
         from_attributes = True
+
+class AlertWithTruck(Alert):
+    truck_registration_number: Optional[str] = None
+
+class AlertWithNames(AlertWithTruck):
+    route_name: Optional[str] = None
+    zone_name: Optional[str] = None
+    ward_name: Optional[str] = None
 
 # Response Models
 class TruckWithDetails(Truck):
@@ -334,3 +355,29 @@ class Analytics(AnalyticsBase):
     
     class Config:
         from_attributes = True
+
+# GTC Checkpoint Schemas
+class GtcCheckpointBase(BaseModel):
+    truck_id: str
+    arrived_at: Optional[datetime] = None
+    is_dry: bool = False
+    is_wet: bool = False
+    is_metal: bool = False
+    is_plastic: bool = False
+    is_sanitary: bool = False
+    truck_cleanliness_score: Optional[int] = None
+    gtc_cleanliness_score: Optional[int] = None
+    remarks: Optional[str] = None
+
+class GtcCheckpointCreate(GtcCheckpointBase):
+    pass
+
+class GtcCheckpoint(GtcCheckpointBase):
+    id: int
+    arrived_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class GtcCheckpointWithTruck(GtcCheckpoint):
+    truck_registration_number: Optional[str] = None

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,15 +26,25 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { ArrowLeft, Search, Download, Truck, MapPin, User, Building2, Activity } from "lucide-react";
+import { ArrowLeft, Search, Download, Truck, MapPin, User, Building2, Activity, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useLiveTrucks, useVendors, useZones, useZoneWards } from "@/hooks/useDataQueries";
 import { trucks } from "@/data/fleetData";
-import { mockVendors, mockZones, mockWards } from "@/data/masterData";
+import { PageHeader } from "@/components/PageHeader";
+// Removed mock data imports - using API only
 
 const ITEMS_PER_PAGE = 10;
 
 const ActiveTrucks = () => {
   const navigate = useNavigate();
+  const { data: vendorsData = [], isLoading: isLoadingVendors } = useVendors();
+  const { data: zonesData = [], isLoading: isLoadingZones } = useZones();
+  const { data: wardsData = [], isLoading: isLoadingWards } = useZoneWards();
+  
+  const [vendors, setVendors] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [wards, setWards] = useState([]);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [vendorFilter, setVendorFilter] = useState("all");
   const [zoneFilter, setZoneFilter] = useState("all");
@@ -42,19 +52,32 @@ const ActiveTrucks = () => {
   const [routeTypeFilter, setRouteTypeFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Sync API data to state
+  useEffect(() => {
+    setVendors(vendorsData);
+  }, [vendorsData]);
+
+  useEffect(() => {
+    setZones(zonesData);
+  }, [zonesData]);
+
+  useEffect(() => {
+    setWards(wardsData);
+  }, [wardsData]);
+
   const activeTrucks = useMemo(() => {
     return trucks.filter(truck => 
       truck.status === 'moving' || truck.status === 'idle' || truck.status === 'dumping'
     );
   }, []);
 
-  const vendors = useMemo(() => {
-    return mockVendors.map(v => ({ id: v.id, name: v.companyName }));
-  }, []);
+  const displayVendors = useMemo(() => {
+    return vendors.map(v => ({ id: v.id, name: v.companyName }));
+  }, [vendors]);
 
   const filteredWards = zoneFilter !== "all" 
-    ? mockWards.filter(w => w.zoneId === zoneFilter) 
-    : mockWards;
+    ? wards.filter(w => w.zoneId === zoneFilter) 
+    : wards;
 
   const filteredTrucks = useMemo(() => {
     return activeTrucks.filter(truck => {
@@ -77,7 +100,7 @@ const ActiveTrucks = () => {
 
   const getVendorName = (vendorId?: string) => {
     if (!vendorId) return "—";
-    const vendor = mockVendors.find(v => v.id === vendorId);
+    const vendor = vendors.find(v => v.id === vendorId);
     return vendor?.companyName || "—";
   };
 
@@ -98,8 +121,8 @@ const ActiveTrucks = () => {
     const csvContent = [
       ["Truck", "Driver", "Vendor", "Route", "Zone", "Block", "Type", "Status", "Speed", "Last Update"].join(","),
       ...filteredTrucks.map(truck => {
-        const zone = mockZones.find(z => z.id === truck.zoneId);
-        const ward = mockWards.find(w => w.id === truck.wardId);
+        const zone = zones.find(z => z.id === truck.zoneId);
+        const ward = wards.find(w => w.id === truck.wardId);
         return [truck.truckNumber, truck.driver, getVendorName(truck.vendorId), truck.route || '', zone?.name || '', ward?.name || '', truck.truckType, truck.status, truck.speed || 0, truck.lastUpdate].join(",");
       })
     ].join("\n");
@@ -113,21 +136,23 @@ const ActiveTrucks = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Active Trucks</h1>
-            <p className="text-muted-foreground text-sm">All currently active trucks in the fleet</p>
-          </div>
-        </div>
-        <Button variant="outline" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        category="Fleet"
+        title="Active Trucks"
+        description="All currently active trucks in the fleet with live status"
+        icon={Truck}
+        actions={
+          <>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="p-4 border-l-4 border-l-success">
@@ -167,7 +192,7 @@ const ActiveTrucks = () => {
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Zones" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Zones</SelectItem>
-              {mockZones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}
+              {zones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={wardFilter} onValueChange={(v) => { setWardFilter(v); setCurrentPage(1); }}>
@@ -184,7 +209,7 @@ const ActiveTrucks = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Vendors</SelectItem>
-              {vendors.map(vendor => <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>)}
+              {displayVendors.map(vendor => <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={routeTypeFilter} onValueChange={(v) => { setRouteTypeFilter(v); setCurrentPage(1); }}>
@@ -216,8 +241,8 @@ const ActiveTrucks = () => {
           </TableHeader>
           <TableBody>
             {paginatedTrucks.map((truck) => {
-              const zone = mockZones.find(z => z.id === truck.zoneId);
-              const ward = mockWards.find(w => w.id === truck.wardId);
+              const zone = zones.find(z => z.id === truck.zoneId);
+              const ward = wards.find(w => w.id === truck.wardId);
               return (
                 <TableRow key={truck.id}>
                   <TableCell className="font-medium">{truck.truckNumber}</TableCell>

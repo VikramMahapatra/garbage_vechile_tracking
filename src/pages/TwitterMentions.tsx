@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '@/components/PageHeader';
 
 // Mock tweet data - in production, this would come from Twitter API
 const mockTweets = [
@@ -232,86 +233,93 @@ export default function TwitterMentions() {
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Twitter className="h-8 w-8 text-[#1DA1F2]" />
-            Twitter Mentions
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Tracking mentions of <span className="text-primary font-medium">{trackedHandle}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
-            <Settings className="h-4 w-4 mr-2" />
-            Configure Handle
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        category="Social Media"
+        title="Twitter Mentions"
+        description={`Tracking mentions of ${trackedHandle}`}
+        icon={Twitter}
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
+              <Settings className="h-4 w-4 mr-2" />
+              Configure Handle
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4">
+        <Card className="p-4 border-l-4 border-l-[#1DA1F2]">
+          <CardContent className="p-0">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Mentions</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
               </div>
-              <MessageCircle className="h-8 w-8 text-[#1DA1F2] opacity-50" />
+              <div className="h-12 w-12 rounded-xl bg-[#1DA1F2]/10 flex items-center justify-center">
+                <MessageCircle className="h-6 w-6 text-[#1DA1F2]" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4">
+        <Card className="p-4 border-l-4 border-l-emerald-500">
+          <CardContent className="p-0">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Positive</p>
                 <p className="text-2xl font-bold text-emerald-400">{stats.positive}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-emerald-400 opacity-50" />
+              <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-emerald-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4">
+        <Card className="p-4 border-l-4 border-l-red-500">
+          <CardContent className="p-0">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Negative</p>
                 <p className="text-2xl font-bold text-red-400">{stats.negative}</p>
               </div>
-              <AlertCircle className="h-8 w-8 text-red-400 opacity-50" />
+              <div className="h-12 w-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4">
+        <Card className="p-4 border-l-4 border-l-amber-500">
+          <CardContent className="p-0">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Neutral</p>
                 <p className="text-2xl font-bold text-amber-400">{stats.neutral}</p>
               </div>
-              <Clock className="h-8 w-8 text-amber-400 opacity-50" />
+              <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-amber-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4">
+        <Card className="p-4 border-l-4 border-l-orange-500">
+          <CardContent className="p-0">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Complaints</p>
                 <p className="text-2xl font-bold text-orange-400">{stats.complaints}</p>
               </div>
-              <Filter className="h-8 w-8 text-orange-400 opacity-50" />
+              <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                <Filter className="h-6 w-6 text-orange-400" />
+              </div>
             </div>
           </CardContent>
         </Card>

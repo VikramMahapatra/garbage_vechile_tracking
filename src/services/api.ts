@@ -54,6 +54,21 @@ export interface Statistics {
   active_alerts: number;
 }
 
+export interface GtcCheckpointEntry {
+  id: number;
+  truck_id: string;
+  arrived_at: string;
+  is_dry: boolean;
+  is_wet: boolean;
+  is_metal: boolean;
+  is_plastic: boolean;
+  is_sanitary: boolean;
+  truck_cleanliness_score: number | null;
+  gtc_cleanliness_score: number | null;
+  remarks: string | null;
+  truck_registration_number?: string | null;
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -89,11 +104,20 @@ class ApiService {
 
   async getTrucks(filters?: { zone_id?: string; vendor_id?: string; status?: string }): Promise<any[]> {
     const params = new URLSearchParams(filters as Record<string, string>);
-    return this.fetchApi(`/trucks?${params.toString()}`);
+    const query = params.toString();
+    const suffix = query ? `?${query}` : "";
+    return this.fetchApi(`/trucks/${suffix}`);
   }
 
   async getSpareTrucks(): Promise<any[]> {
     return this.fetchApi('/trucks/spare');
+  }
+
+  async assignTruckRoute(truckId: string, routeId: string): Promise<any> {
+    return this.fetchApi(`/trucks/${truckId}/assign-route`, {
+      method: 'PUT',
+      body: JSON.stringify({ assigned_route_id: routeId }),
+    });
   }
 
   // Zones
@@ -121,6 +145,10 @@ class ApiService {
 
   async getExpiryAlerts(): Promise<any> {
     return this.fetchApi('/alerts/expiry');
+  }
+
+  async getReportsData(): Promise<Record<string, any>> {
+    return this.fetchApi('/reports/data');
   }
 
   // Reports
@@ -192,6 +220,15 @@ class ApiService {
   async getTickets(filters?: { status?: string; priority?: string; category?: string }): Promise<any[]> {
     const params = new URLSearchParams(filters as Record<string, string>);
     return this.fetchApi(`/tickets/?${params.toString()}`);
+  }
+
+  // Drivers
+  async getDrivers(): Promise<any[]> {
+    return this.fetchApi('/drivers/');
+  }
+
+  async getDriver(driverId: string): Promise<any> {
+    return this.fetchApi(`/drivers/${driverId}`);
   }
 
   async getTicket(ticketId: string): Promise<any> {
@@ -271,6 +308,44 @@ class ApiService {
 
   async getCollectionRateTrends(): Promise<any[]> {
     return this.fetchApi('/analytics/trends/collection-rate');
+  }
+
+  // GTC Checkpoints
+  async getGtcCheckpoints(filters?: {
+    truck_id?: string;
+    date?: string;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<GtcCheckpointEntry[]> {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) {
+          params.append(key, value);
+        }
+      });
+    }
+    const query = params.toString();
+    const suffix = query ? `?${query}` : "";
+    return this.fetchApi(`/gtc-checkpoints/${suffix}`);
+  }
+
+  async createGtcCheckpoint(payload: {
+    truck_id: string;
+    arrived_at?: string;
+    is_dry: boolean;
+    is_wet: boolean;
+    is_metal: boolean;
+    is_plastic: boolean;
+    is_sanitary: boolean;
+    truck_cleanliness_score?: number | null;
+    gtc_cleanliness_score?: number | null;
+    remarks?: string | null;
+  }): Promise<GtcCheckpointEntry> {
+    return this.fetchApi('/gtc-checkpoints/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 

@@ -131,4 +131,49 @@ All colors MUST be HSL.
   [class*="overflow-x-auto"] {
     overflow-anchor: none;
   }
+
+  /* Colorful, subtle scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+    border-radius: 999px;
+    border: 2px solid hsl(var(--muted));
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(var(--secondary)) 0%, hsl(var(--primary)) 100%);
+  }
+}
+
+@layer components {
+  .app-surface {
+    background-color: hsl(var(--background));
+    background-image:
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted) / 0.7) 100%),
+      radial-gradient(circle at 18% 12%, hsl(var(--primary) / 0.1), transparent 40%),
+      radial-gradient(circle at 82% 8%, hsl(var(--secondary) / 0.08), transparent 35%),
+      repeating-linear-gradient(
+        135deg,
+        hsl(var(--foreground) / 0.03) 0,
+        hsl(var(--foreground) / 0.03) 1px,
+        transparent 1px,
+        transparent 7px
+      );
+    background-attachment: local;
+    background-size: cover;
+  }
 }

@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { apiService } from '@/services/api';
-import { Plus, Search, Edit, Trash2, User, Shield, UserCheck, UserX, Mail, Calendar, Key } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User, Shield, UserCheck, UserX, Mail, Calendar, Key, UserPlus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { PageHeader } from '@/components/PageHeader';
 
 interface User {
   id: string;
@@ -240,19 +241,20 @@ export default function Users() {
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-          <p className="text-muted-foreground">Manage user accounts, roles, and permissions</p>
-        </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingUser(null); resetForm(); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
+      <PageHeader
+        category="Administration"
+        title="User Management"
+        description="Manage user accounts, roles, and permissions"
+        icon={UserPlus}
+        actions={
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { setEditingUser(null); resetForm(); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
               <DialogDescription>
@@ -318,59 +320,80 @@ export default function Users() {
                 {editingUser ? 'Update' : 'Create'}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {users.filter(u => u.is_active).length}
+        <Card className="p-4 border-l-4 border-l-border">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Users</p>
+                <p className="text-2xl font-bold text-foreground">{users.length}</p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-muted/30 flex items-center justify-center">
+                <User className="h-6 w-6 text-muted-foreground" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Administrators</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {users.filter(u => u.role === 'admin').length}
+        <Card className="p-4 border-l-4 border-l-success">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active Users</p>
+                <p className="text-2xl font-bold text-success">
+                  {users.filter(u => u.is_active).length}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
+                <UserCheck className="h-6 w-6 text-success" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Regular Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {users.filter(u => u.role === 'user').length}
+        <Card className="p-4 border-l-4 border-l-primary">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Administrators</p>
+                <p className="text-2xl font-bold text-primary">
+                  {users.filter(u => u.role === 'admin').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="p-4 border-l-4 border-l-warning">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Regular Users</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {users.filter(u => u.role === 'user').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
+                <UserX className="h-6 w-6 text-warning" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Users List</CardTitle>
+      <Card className="p-4">
+        <CardHeader className="p-0 pb-3">
+          <CardTitle className="text-lg">Users List</CardTitle>
           <CardDescription>View and manage all system users</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />

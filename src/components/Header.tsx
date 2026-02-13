@@ -1,5 +1,26 @@
-import { Bell, User, LogOut, Shield } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  ClipboardCheck,
+  Database,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Map,
+  MapPin,
+  Route,
+  Settings,
+  Shield,
+  Ticket,
+  Truck,
+  Twitter,
+  User,
+  Users,
+  Wrench,
+} from "lucide-react";
+import { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
@@ -15,6 +36,57 @@ import { Badge } from "@/components/ui/badge";
 export default function Header() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const breadcrumbs = useMemo(() => {
+    const segmentMeta: Record<string, { label: string; icon: typeof LayoutDashboard }> = {
+      "auth": { label: "Auth", icon: Users },
+      "master": { label: "Master Data", icon: Database },
+      "zones-wards": { label: "Zones & Wards", icon: MapPin },
+      "routes-pickups": { label: "Routes & Pickups", icon: Route },
+      "pickup-points": { label: "Pickup Points", icon: MapPin },
+      "spare-vehicles": { label: "Spare Vehicles", icon: Wrench },
+      "gtc-checkpoint": { label: "GTC Checkpoint", icon: ClipboardCheck },
+      "active-trucks": { label: "Active Trucks", icon: Truck },
+      "active-alerts": { label: "Active Alerts", icon: AlertTriangle },
+      "collection-rate": { label: "Collection Rate", icon: BarChart3 },
+      "trips-completed": { label: "Trips Completed", icon: BarChart3 },
+      "twitter": { label: "Twitter Mentions", icon: Twitter },
+      "alerts": { label: "Alerts", icon: AlertTriangle },
+      "reports": { label: "Reports", icon: FileText },
+      "analytics": { label: "Analytics", icon: BarChart3 },
+      "routes": { label: "Routes", icon: Map },
+      "fleet": { label: "Fleet", icon: Truck },
+      "tickets": { label: "Tickets", icon: Ticket },
+      "users": { label: "Users", icon: Users },
+      "settings": { label: "Settings", icon: Settings },
+    };
+
+    const toTitle = (value: string) =>
+      value
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    const parts = location.pathname.split("/").filter(Boolean);
+    if (parts.length === 0) {
+      return [{ label: "Dashboard", path: "/", icon: LayoutDashboard }];
+    }
+
+    const items = [{ label: "Dashboard", path: "/", icon: LayoutDashboard }];
+    let currentPath = "";
+
+    parts.forEach((part) => {
+      currentPath += `/${part}`;
+      const meta = segmentMeta[part];
+      items.push({
+        label: meta?.label ?? toTitle(part),
+        path: currentPath,
+        icon: meta?.icon ?? LayoutDashboard,
+      });
+    });
+
+    return items;
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -23,17 +95,34 @@ export default function Header() {
 
   return (
     <div className="flex items-center justify-between flex-1">
-      <div>
-        <h1 className="text-lg font-semibold">Fleet Tracking System</h1>
-        <p className="text-xs text-muted-foreground">Municipal Garbage Collection</p>
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 via-secondary/15 to-transparent ring-1 ring-primary/20">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)]" />
+        </div>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold bg-gradient-to-r from-primary via-secondary to-emerald-500 bg-clip-text text-transparent">
+              SwachhPath
+            </h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground/80">Transparent route & collection tracking</p>
+        </div>
       </div>
       
       <div className="flex items-center gap-2">
+        <div className="hidden md:inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-600">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          System Online
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+            <Button variant="ghost" size="icon" className="relative h-9 w-9 text-muted-foreground hover:text-foreground">
+              <Bell className="h-4 w-4" />
+              <Badge className="absolute -top-0.5 -right-0.5 h-4 w-4 flex items-center justify-center p-0 text-[10px]">
                 3
               </Badge>
             </Button>
@@ -64,8 +153,8 @@ export default function Header() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <User className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="relative h-9 w-9 text-muted-foreground hover:text-foreground">
+              <User className="h-4 w-4" />
               {isAdmin && (
                 <Shield className="absolute -bottom-1 -right-1 h-3 w-3 text-primary" />
               )}

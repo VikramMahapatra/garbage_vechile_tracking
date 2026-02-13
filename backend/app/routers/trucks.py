@@ -96,3 +96,23 @@ def update_truck(truck_id: str, truck: schemas.TruckBase, db: Session = Depends(
     db.commit()
     db.refresh(db_truck)
     return db_truck
+
+@router.put("/{truck_id}/assign-route", response_model=schemas.Truck)
+def assign_route(truck_id: str, payload: schemas.TruckAssignRoute, db: Session = Depends(get_db)):
+    db_truck = db.query(models.Truck).filter(models.Truck.id == truck_id).first()
+    if not db_truck:
+        raise HTTPException(status_code=404, detail="Truck not found")
+
+    if payload.assigned_route_id:
+        route = db.query(models.Route).filter(models.Route.id == payload.assigned_route_id).first()
+        if not route:
+            raise HTTPException(status_code=404, detail="Route not found")
+        db_truck.assigned_route_id = route.id
+        db_truck.zone_id = route.zone_id
+        db_truck.ward_id = route.ward_id
+    else:
+        db_truck.assigned_route_id = None
+
+    db.commit()
+    db.refresh(db_truck)
+    return db_truck

@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { LoadScript } from "@react-google-maps/api";
+import { GOOGLE_MAPS_API_KEY } from "@/data/fleetData";
 import Layout from "@/components/Layout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -28,6 +30,8 @@ import TripsCompleted from "./pages/TripsCompleted";
 import ActiveAlertsDetail from "./pages/ActiveAlertsDetail";
 import CollectionRate from "./pages/CollectionRate";
 import NotFound from "./pages/NotFound";
+import GtcCheckpoint from "./pages/GtcCheckpoint";
+import CollectionTonToday from "./pages/CollectionTonToday";
 
 const queryClient = new QueryClient();
 
@@ -50,36 +54,40 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/fleet" element={<ProtectedRoute><Fleet /></ProtectedRoute>} />
-            <Route path="/spare-vehicles" element={<ProtectedRoute><SpareVehicles /></ProtectedRoute>} />
-            <Route path="/routes" element={<ProtectedRoute><RoutesPage /></ProtectedRoute>} />
-            <Route path="/pickup-points" element={<ProtectedRoute><PickupPoints /></ProtectedRoute>} />
-            <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-            <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/twitter" element={<ProtectedRoute><TwitterMentions /></ProtectedRoute>} />
-            <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
-            <Route path="/master/drivers" element={<ProtectedRoute><MasterDrivers /></ProtectedRoute>} />
-            <Route path="/master/vendors" element={<ProtectedRoute><MasterVendors /></ProtectedRoute>} />
-            <Route path="/master/trucks" element={<ProtectedRoute><MasterTrucks /></ProtectedRoute>} />
-            <Route path="/master/zones-wards" element={<ProtectedRoute><MasterZonesWards /></ProtectedRoute>} />
-            <Route path="/master/routes-pickups" element={<ProtectedRoute><MasterRoutesPickups /></ProtectedRoute>} />
-            <Route path="/active-trucks" element={<ProtectedRoute><ActiveTrucks /></ProtectedRoute>} />
-            <Route path="/trips-completed" element={<ProtectedRoute><TripsCompleted /></ProtectedRoute>} />
-            <Route path="/active-alerts" element={<ProtectedRoute><ActiveAlertsDetail /></ProtectedRoute>} />
-            <Route path="/collection-rate" element={<ProtectedRoute><CollectionRate /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
+        <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/fleet" element={<ProtectedRoute><Fleet /></ProtectedRoute>} />
+              <Route path="/spare-vehicles" element={<ProtectedRoute><SpareVehicles /></ProtectedRoute>} />
+              <Route path="/routes" element={<ProtectedRoute><RoutesPage /></ProtectedRoute>} />
+              <Route path="/pickup-points" element={<ProtectedRoute><PickupPoints /></ProtectedRoute>} />
+              <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/twitter" element={<ProtectedRoute><TwitterMentions /></ProtectedRoute>} />
+              <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
+              <Route path="/master/drivers" element={<ProtectedRoute><MasterDrivers /></ProtectedRoute>} />
+              <Route path="/master/vendors" element={<ProtectedRoute><MasterVendors /></ProtectedRoute>} />
+              <Route path="/master/trucks" element={<ProtectedRoute><MasterTrucks /></ProtectedRoute>} />
+              <Route path="/master/zones-wards" element={<ProtectedRoute><MasterZonesWards /></ProtectedRoute>} />
+              <Route path="/master/routes-pickups" element={<ProtectedRoute><MasterRoutesPickups /></ProtectedRoute>} />
+              <Route path="/active-trucks" element={<ProtectedRoute><ActiveTrucks /></ProtectedRoute>} />
+              <Route path="/trips-completed" element={<ProtectedRoute><TripsCompleted /></ProtectedRoute>} />
+              <Route path="/active-alerts" element={<ProtectedRoute><ActiveAlertsDetail /></ProtectedRoute>} />
+              <Route path="/collection-rate" element={<ProtectedRoute><CollectionRate /></ProtectedRoute>} />
+              <Route path="/gtc-checkpoint" element={<ProtectedRoute><GtcCheckpoint /></ProtectedRoute>} />
+              <Route path="/collection-ton-today" element={<ProtectedRoute><CollectionTonToday /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </LoadScript>
     </TooltipProvider>
   </QueryClientProvider>
 );

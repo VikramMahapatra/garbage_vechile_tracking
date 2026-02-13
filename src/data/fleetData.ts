@@ -3,7 +3,7 @@
 
 export type { TruckStatus, DeviceStatus, RouteType } from './trucks';
 export type { GPSDevice, TruckLive as TruckData } from './trucks';
-export type { Route as RouteData, RoutePoint, GCPLocation, FinalDumpingSite, HistoricalPath } from './routes';
+export type { Route as RouteData, RoutePoint, GTPLocation, FinalDumpingSite, HistoricalPath } from './routes';
 export type { PickupPoint } from './routes';
 
 // Re-export RouteType as TruckType for backward compatibility in components that use it for primary/secondary
@@ -11,5 +11,5 @@ export type { RouteType as TruckType } from './trucks';
 
 export { trucksLive as trucks } from './trucks';
 export { routes } from './routes';
-export { gcpLocations, finalDumpingSites, pickupPoints, generateHistoricalPath } from './routes';
+export { gtpLocations, finalDumpingSites, pickupPoints, generateHistoricalPath } from './routes';
 export { GOOGLE_MAPS_API_KEY, KHARADI_CENTER } from './routes';

@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow } from "@react-google-maps/api";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow, Polygon } from "@react-google-maps/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   MapPin, Save, Trash2, X, Plus, GripVertical, 
-  Navigation, Target, CircleDot, Building2, Clock
+  Navigation, Target, CircleDot, Building2, Clock, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { GOOGLE_MAPS_API_KEY, KHARADI_CENTER, gcpLocations, finalDumpingSites, RoutePoint, RouteData, TruckType } from "@/data/fleetData";
+import { GOOGLE_MAPS_API_KEY, KHARADI_CENTER, gtpLocations, finalDumpingSites, RoutePoint, RouteData, TruckType } from "@/data/fleetData";
+import { useZones, useZoneWards } from "@/hooks/useDataQueries";
 
 interface RouteMapBuilderProps {
   route?: RouteData | null;
@@ -27,24 +28,130 @@ const containerStyle = {
 
 export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: RouteMapBuilderProps) {
   const [routeName, setRouteName] = useState(route?.name || "");
+  const [zoneId, setZoneId] = useState(route?.zoneId || "");
+  const [wardId, setWardId] = useState(route?.wardId || "");
   const [points, setPoints] = useState<RoutePoint[]>(route?.points || []);
   const [selectedPoint, setSelectedPoint] = useState<RoutePoint | null>(null);
   const [isAddingPoint, setIsAddingPoint] = useState(false);
   const [newPointName, setNewPointName] = useState("");
-  const [newPointType, setNewPointType] = useState<"pickup" | "gcp" | "dumping">("pickup");
+  const [newPointType, setNewPointType] = useState<"pickup" | "gtp" | "dumping">("pickup");
   const [newPointTime, setNewPointTime] = useState("07:00");
   const [tempMarker, setTempMarker] = useState<{ lat: number; lng: number } | null>(null);
+  const [wardPolygons, setWardPolygons] = useState<Array<Array<{ lat: number; lng: number }>>>([]);
+  const [wardMatchLabel, setWardMatchLabel] = useState<string | null>(null);
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+
+  // Fetch zones and wards from API
+  const { data: zonesData = [], isLoading: isLoadingZones } = useZones();
+  const { data: wardsData = [], isLoading: isLoadingWards } = useZoneWards(zoneId);
+
+  // Set default zone if not set and zones are loaded
+  useEffect(() => {
+    if (!zoneId && zonesData.length > 0) {
+      setZoneId(zonesData[0].id);
+    }
+  }, [zonesData, zoneId]);
+
+  // Filter wards for selected zone
+  const wardsForZone = useMemo(() => wardsData, [wardsData]);
+
+  // Set default ward if not set
+  useEffect(() => {
+    if (!wardId && wardsForZone.length > 0) {
+      setWardId(wardsForZone[0].id);
+    }
+  }, [wardId, wardsForZone]);
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 
+  useEffect(() => {
+    const selectedWard = wardsForZone.find((ward) => ward.id === wardId);
+    if (!selectedWard) {
+      setWardPolygons([]);
+      setWardMatchLabel(null);
+      return;
+    }
+
+    const normalizeText = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const parseCoordinates = (value: string) => value
+      .trim()
+      .split(/\s+/)
+      .map((pair) => {
+        const [lng, lat] = pair.split(",").map(Number);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+      })
+      .filter((point): point is { lat: number; lng: number } => point !== null);
+
+    const loadWardBoundary = async () => {
+      try {
+        const response = await fetch("/ward-boundaries.kml");
+        if (!response.ok) {
+          setWardPolygons([]);
+          setWardMatchLabel(null);
+          return;
+        }
+        const kmlText = await response.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(kmlText, "application/xml");
+        const placemarks = Array.from(xml.getElementsByTagName("Placemark"));
+        const target = normalizeText(selectedWard.name);
+
+        const extractSimpleData = (placemark: Element, name: string) => {
+          const entries = Array.from(placemark.getElementsByTagName("SimpleData"));
+          const match = entries.find((entry) => entry.getAttribute("name") === name);
+          return match?.textContent?.trim() || "";
+        };
+
+        const matchPlacemark = placemarks.find((placemark) => {
+          const wardName = normalizeText(extractSimpleData(placemark, "ward"));
+          const prabhagName = normalizeText(extractSimpleData(placemark, "prabhag"));
+          return wardName.includes(target) || prabhagName.includes(target) || target.includes(wardName) || target.includes(prabhagName);
+        });
+
+        if (!matchPlacemark) {
+          setWardPolygons([]);
+          setWardMatchLabel(null);
+          return;
+        }
+
+        const wardName = extractSimpleData(matchPlacemark, "ward");
+        const prabhagName = extractSimpleData(matchPlacemark, "prabhag");
+        setWardMatchLabel(prabhagName ? `${wardName} (${prabhagName})` : wardName || selectedWard.name);
+
+        const boundaries = Array.from(matchPlacemark.getElementsByTagName("outerBoundaryIs"));
+        const polygons = boundaries
+          .map((boundary) => boundary.getElementsByTagName("coordinates")[0]?.textContent || "")
+          .map((coords) => parseCoordinates(coords))
+          .filter((path) => path.length > 0);
+
+        setWardPolygons(polygons);
+      } catch {
+        setWardPolygons([]);
+        setWardMatchLabel(null);
+      }
+    };
+
+    loadWardBoundary();
+  }, [wardId]);
+
+  useEffect(() => {
+    if (!mapInstance || wardPolygons.length === 0) return;
+    const bounds = new google.maps.LatLngBounds();
+    wardPolygons.forEach((path) => path.forEach((point) => bounds.extend(point)));
+    if (!bounds.isEmpty()) {
+      mapInstance.fitBounds(bounds);
+    }
+  }, [mapInstance, wardPolygons]);
+
   // Get point type color
   const getPointColor = (type: string) => {
     switch (type) {
       case "pickup": return "#22c55e";
-      case "gcp": return "#f59e0b";
+      case "gtp": return "#f59e0b";
       case "dumping": return "#ef4444";
       default: return "#6b7280";
     }
@@ -63,15 +170,41 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
     };
   };
 
+  const isPointInPolygon = (point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].lng;
+      const yi = polygon[i].lat;
+      const xj = polygon[j].lng;
+      const yj = polygon[j].lat;
+      const intersects = (yi > point.lat) !== (yj > point.lat)
+        && point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi + 0.0) + xi;
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  };
+
+  const isPointInWard = (point: { lat: number; lng: number }) => {
+    if (wardPolygons.length === 0) return true;
+    return wardPolygons.some((polygon) => isPointInPolygon(point, polygon));
+  };
+
   // Handle map click
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (!isAddingPoint || !e.latLng) return;
-    
-    setTempMarker({
+
+    const candidate = {
       lat: e.latLng.lat(),
-      lng: e.latLng.lng()
-    });
-  }, [isAddingPoint]);
+      lng: e.latLng.lng(),
+    };
+
+    if (!isPointInWard(candidate)) {
+      toast.error("Pickup point must be inside the selected ward boundary");
+      return;
+    }
+
+    setTempMarker(candidate);
+  }, [isAddingPoint, wardPolygons]);
 
   // Add point from temp marker
   const confirmAddPoint = () => {
@@ -97,8 +230,8 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
     toast.success("Point added to route");
   };
 
-  // Add GCP/Dumping site from existing locations
-  const addExistingLocation = (location: { id: string; name: string; position: { lat: number; lng: number } }, type: "gcp" | "dumping") => {
+  // Add GTP/Dumping site from existing locations
+  const addExistingLocation = (location: { id: string; name: string; position: { lat: number; lng: number } }, type: "gtp" | "dumping") => {
     // Calculate suggested time based on previous point
     const suggestedTime = points.length > 0 
       ? calculateNextTime(points[points.length - 1].scheduledTime || "07:00", 30)
@@ -189,6 +322,10 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
 
   // Validate route based on type
   const validateRoute = () => {
+    if (!zoneId || !wardId) {
+      toast.error("Please select a zone and ward");
+      return false;
+    }
     if (!routeName.trim()) {
       toast.error("Please provide a route name");
       return false;
@@ -199,22 +336,23 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
     }
 
     if (routeType === "primary") {
-      // Primary: should end with GCP
+      // Primary: should end with GTP and include only one GTP
       const lastPoint = points[points.length - 1];
-      if (lastPoint.type !== "gcp") {
-        toast.error("Primary routes must end with a GCP (Garbage Collection Point)");
+      const gtpPoints = points.filter((point) => point.type === "gtp");
+      if (gtpPoints.length !== 1 || lastPoint.type !== "gtp") {
+        toast.error("Primary routes must end with exactly one GTP (Garbage Transfer Point)");
         return false;
       }
     } else {
-      // Secondary: should start with GCP and end with dumping
+      // Secondary: should start with GTP and end with dumping
       const firstPoint = points[0];
       const lastPoint = points[points.length - 1];
-      if (firstPoint.type !== "gcp") {
-        toast.error("Secondary routes must start with a GCP");
+      if (firstPoint.type !== "gtp") {
+        toast.error("Secondary routes must start with a GTP");
         return false;
       }
       if (lastPoint.type !== "dumping") {
-        toast.error("Secondary routes must end with a Dumping Site");
+        toast.error("Secondary routes must end with a Dumping Yard");
         return false;
       }
     }
@@ -231,8 +369,8 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
       name: routeName,
       code: routeName.substring(0, 6).toUpperCase().replace(/\s/g, '-'),
       type: routeType,
-      wardId: route?.wardId || 'WD006',
-      zoneId: route?.zoneId || 'ZN003',
+      wardId: wardId || route?.wardId || 'WD006',
+      zoneId: zoneId || route?.zoneId || 'ZN003',
       points,
       distance: calculateDistance(),
       estimatedDistance: parseInt(calculateDistance()) || 10,
@@ -263,182 +401,223 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
           </Badge>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
-          {/* Route Name */}
-          <div>
-            <Label>Route Name</Label>
-            <Input 
-              value={routeName}
-              onChange={(e) => setRouteName(e.target.value)}
-              placeholder="e.g., Kharadi Primary Route 1"
-            />
-          </div>
-
-          {/* Route Info */}
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div className="p-2 bg-muted rounded-lg">
-              <p className="text-lg font-bold text-primary">{points.length}</p>
-              <p className="text-xs text-muted-foreground">Points</p>
-            </div>
-            <div className="p-2 bg-muted rounded-lg">
-              <p className="text-lg font-bold text-primary">{calculateDistance()}</p>
-              <p className="text-xs text-muted-foreground">Distance</p>
-            </div>
-          </div>
-
-          {/* Quick Add GCP/Dumping */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Quick Add Location</Label>
-            <div className="flex gap-2">
-              <Select onValueChange={(v) => {
-                const gcp = gcpLocations.find(g => g.id === v);
-                if (gcp) addExistingLocation(gcp, "gcp");
-              }}>
-                <SelectTrigger className="flex-1 h-8 text-xs">
-                  <SelectValue placeholder="Add GCP" />
-                </SelectTrigger>
-                <SelectContent>
-                  {gcpLocations.map(gcp => (
-                    <SelectItem key={gcp.id} value={gcp.id}>{gcp.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select onValueChange={(v) => {
-                const site = finalDumpingSites.find(s => s.id === v);
-                if (site) addExistingLocation(site, "dumping");
-              }}>
-                <SelectTrigger className="flex-1 h-8 text-xs">
-                  <SelectValue placeholder="Add Dump" />
-                </SelectTrigger>
-                <SelectContent>
-                  {finalDumpingSites.map(site => (
-                    <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Points List */}
-          <div className="flex-1 overflow-auto">
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs text-muted-foreground">Route Points</Label>
-              <Button 
-                size="sm" 
-                variant={isAddingPoint ? "secondary" : "outline"}
-                className="h-7 text-xs"
-                onClick={() => {
-                  setIsAddingPoint(!isAddingPoint);
-                  setTempMarker(null);
-                }}
-              >
-                {isAddingPoint ? <X className="h-3 w-3 mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-                {isAddingPoint ? "Cancel" : "Add Pickup"}
-              </Button>
-            </div>
-            
-            {isAddingPoint && (
-              <div className="p-3 mb-3 bg-primary/10 rounded-lg border border-primary/30">
-                <p className="text-xs text-muted-foreground mb-2">Click on map to place point</p>
-                <Input
-                  value={newPointName}
-                  onChange={(e) => setNewPointName(e.target.value)}
-                  placeholder="Point name"
-                  className="mb-2 h-8"
-                />
-                <Select value={newPointType} onValueChange={(v) => setNewPointType(v as any)}>
-                  <SelectTrigger className="h-8 text-xs mb-2">
-                    <SelectValue />
+          <div className="flex-1 min-h-0 overflow-auto pr-2">
+            {/* Zone and Ward */}
+            <div className="space-y-3">
+              <div>
+                <Label>Zone</Label>
+                <Select value={zoneId} onValueChange={(value) => setZoneId(value)} disabled={isLoadingZones}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingZones ? "Loading zones..." : "Select zone"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pickup">Pickup Point</SelectItem>
-                    <SelectItem value="gcp">GCP</SelectItem>
-                    <SelectItem value="dumping">Dumping Site</SelectItem>
+                    {zonesData.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="time"
-                    value={newPointTime}
-                    onChange={(e) => setNewPointTime(e.target.value)}
-                    className="h-8 flex-1"
-                  />
-                </div>
-                {tempMarker && (
-                  <Button size="sm" className="w-full h-8" onClick={confirmAddPoint}>
-                    Confirm Location
-                  </Button>
+              </div>
+              <div>
+                <Label>Ward</Label>
+                <Select value={wardId} onValueChange={(value) => setWardId(value)} disabled={isLoadingWards || !zoneId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingWards ? "Loading wards..." : "Select ward"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {wardsForZone.map((ward) => (
+                      <SelectItem key={ward.id} value={ward.id}>
+                        {ward.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {wardMatchLabel && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Boundary: {wardMatchLabel}
+                  </p>
                 )}
               </div>
-            )}
+            </div>
 
+            {/* Route Name */}
+            <div>
+              <Label>Route Name</Label>
+              <Input 
+                value={routeName}
+                onChange={(e) => setRouteName(e.target.value)}
+                placeholder="e.g., Kharadi Primary Route 1"
+              />
+            </div>
+
+            {/* Route Info */}
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-2 bg-muted rounded-lg">
+                <p className="text-lg font-bold text-primary">{points.length}</p>
+                <p className="text-xs text-muted-foreground">Points</p>
+              </div>
+              <div className="p-2 bg-muted rounded-lg">
+                <p className="text-lg font-bold text-primary">{calculateDistance()}</p>
+                <p className="text-xs text-muted-foreground">Distance</p>
+              </div>
+            </div>
+
+            {/* Quick Add GTP/Dumping */}
             <div className="space-y-2">
-              {points.map((point, index) => (
-                <div 
-                  key={point.id}
-                  className={`flex items-center gap-2 p-2 rounded-lg border transition-colors cursor-pointer
-                    ${selectedPoint?.id === point.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
-                  onClick={() => setSelectedPoint(point)}
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <button 
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                      onClick={(e) => { e.stopPropagation(); movePoint(index, "up"); }}
-                      disabled={index === 0}
-                    >
-                      ▲
-                    </button>
-                    <button 
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                      onClick={(e) => { e.stopPropagation(); movePoint(index, "down"); }}
-                      disabled={index === points.length - 1}
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  <div 
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                    style={{ backgroundColor: getPointColor(point.type) }}
-                  >
-                    {point.order}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{point.name}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground capitalize">{point.type}</p>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-primary" />
-                        <input
-                          type="time"
-                          value={point.scheduledTime || "07:00"}
-                          onChange={(e) => { e.stopPropagation(); updatePointTime(point.id, e.target.value); }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-xs font-medium text-primary bg-transparent border-none p-0 w-14 focus:outline-none focus:ring-0"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <button 
-                    className="text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={(e) => { e.stopPropagation(); removePoint(point.id); }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+              <Label className="text-xs text-muted-foreground">Quick Add Location</Label>
+              <div className="flex gap-2">
+                <Select onValueChange={(v) => {
+                  const gtp = gtpLocations.find(g => g.id === v);
+                  if (gtp) addExistingLocation(gtp, "gtp");
+                }}>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue placeholder="Add GTP" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {gtpLocations.map(gtp => (
+                      <SelectItem key={gtp.id} value={gtp.id}>{gtp.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select onValueChange={(v) => {
+                  const site = finalDumpingSites.find(s => s.id === v);
+                  if (site) addExistingLocation(site, "dumping");
+                }}>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue placeholder="Add Dump" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {finalDumpingSites.map(site => (
+                      <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-              {points.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No points added yet</p>
-                  <p className="text-xs mt-1">
-                    {routeType === "primary" 
-                      ? "Add pickup points, then a GCP as final point"
-                      : "Start with GCP, add points, end with Dumping Site"}
-                  </p>
+            {/* Points List */}
+            <div className="flex-1 overflow-auto">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs text-muted-foreground">Route Points</Label>
+                <Button 
+                  size="sm" 
+                  variant={isAddingPoint ? "secondary" : "outline"}
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setIsAddingPoint(!isAddingPoint);
+                    setTempMarker(null);
+                  }}
+                >
+                  {isAddingPoint ? <X className="h-3 w-3 mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                  {isAddingPoint ? "Cancel" : "Add Pickup"}
+                </Button>
+              </div>
+              
+              {isAddingPoint && (
+                <div className="p-3 mb-3 bg-primary/10 rounded-lg border border-primary/30">
+                  <p className="text-xs text-muted-foreground mb-2">Click on map to place point</p>
+                  <Input
+                    value={newPointName}
+                    onChange={(e) => setNewPointName(e.target.value)}
+                    placeholder="Point name"
+                    className="mb-2 h-8"
+                  />
+                  <Select value={newPointType} onValueChange={(v) => setNewPointType(v as any)}>
+                    <SelectTrigger className="h-8 text-xs mb-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pickup">Pickup Point</SelectItem>
+                      <SelectItem value="gtp">GTP</SelectItem>
+                      <SelectItem value="dumping">Dumping Site</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="time"
+                      value={newPointTime}
+                      onChange={(e) => setNewPointTime(e.target.value)}
+                      className="h-8 flex-1"
+                    />
+                  </div>
+                  {tempMarker && (
+                    <Button size="sm" className="w-full h-8" onClick={confirmAddPoint}>
+                      Confirm Location
+                    </Button>
+                  )}
                 </div>
               )}
+
+              <div className="space-y-2">
+                {points.map((point, index) => (
+                  <div 
+                    key={point.id}
+                    className={`flex items-center gap-2 p-2 rounded-lg border transition-colors cursor-pointer
+                      ${selectedPoint?.id === point.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    onClick={() => setSelectedPoint(point)}
+                  >
+                    <div className="flex flex-col gap-0.5">
+                      <button 
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        onClick={(e) => { e.stopPropagation(); movePoint(index, "up"); }}
+                        disabled={index === 0}
+                      >
+                        ▲
+                      </button>
+                      <button 
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        onClick={(e) => { e.stopPropagation(); movePoint(index, "down"); }}
+                        disabled={index === points.length - 1}
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    <div 
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                      style={{ backgroundColor: getPointColor(point.type) }}
+                    >
+                      {point.order}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{point.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground capitalize">{point.type}</p>
+                        <span className="text-xs text-muted-foreground">•</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-primary" />
+                          <input
+                            type="time"
+                            value={point.scheduledTime || "07:00"}
+                            onChange={(e) => { e.stopPropagation(); updatePointTime(point.id, e.target.value); }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs font-medium text-primary bg-transparent border-none p-0 w-14 focus:outline-none focus:ring-0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <button 
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={(e) => { e.stopPropagation(); removePoint(point.id); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {points.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No points added yet</p>
+                    <p className="text-xs mt-1">
+                      {routeType === "primary" 
+                        ? "Add pickup points, then a GTP as final point"
+                        : "Start with GTP, add points, end with Dumping Yard"}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -464,17 +643,40 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
               center={points.length > 0 ? points[0].position : KHARADI_CENTER}
               zoom={14}
               onClick={handleMapClick}
+              onLoad={(map) => setMapInstance(map)}
               options={{
                 streetViewControl: false,
                 mapTypeControl: true,
                 fullscreenControl: true,
+                zoomControl: true,
+                zoomControlOptions: {
+                  position: window.google?.maps?.ControlPosition?.TOP_RIGHT,
+                },
+                fullscreenControlOptions: {
+                  position: window.google?.maps?.ControlPosition?.TOP_LEFT,
+                },
+                draggableCursor: isAddingPoint ? "crosshair" : undefined,
               }}
             >
-              {/* Existing GCPs */}
-              {gcpLocations.map(gcp => (
+              {wardPolygons.map((path, index) => (
+                <Polygon
+                  key={`ward-boundary-${index}`}
+                  paths={path}
+                  options={{
+                    fillColor: "#60a5fa",
+                    fillOpacity: 0.15,
+                    strokeColor: "#2563eb",
+                    strokeOpacity: 0.6,
+                    strokeWeight: 2,
+                    clickable: false,
+                  }}
+                />
+              ))}
+              {/* Existing GTPs */}
+              {gtpLocations.map(gtp => (
                 <Marker
-                  key={gcp.id}
-                  position={gcp.position}
+                  key={gtp.id}
+                  position={gtp.position}
                   icon={{
                     path: window.google?.maps?.SymbolPath?.BACKWARD_CLOSED_ARROW || 0,
                     fillColor: "#f59e0b",
@@ -483,7 +685,7 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
                     strokeWeight: 2,
                     scale: 5,
                   }}
-                  title={gcp.name}
+                  title={gtp.name}
                 />
               ))}
 
@@ -598,7 +800,7 @@ export default function RouteMapBuilder({ route, routeType, onSave, onCancel }: 
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-amber-500" />
-                <span>GCP (Collection Point)</span>
+                  <span>GTP (Transfer Point)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500" />

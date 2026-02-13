@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Route, MapPin, Truck, Clock, ArrowRight, 
-  Plus, Edit, Trash2, Eye 
+  Plus, Edit, Trash2, Eye, Search 
 } from "lucide-react";
 import { RouteData, trucks } from "@/data/fleetData";
 
@@ -29,9 +31,21 @@ export default function RouteListView({
   onDeleteRoute,
   onCreateRoute,
 }: RouteListViewProps) {
-  const filteredRoutes = routes.filter(route => 
-    filterType === "all" || route.type === filterType
-  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredRoutes = routes.filter((route) => {
+    if (filterType !== "all" && route.type !== filterType) return false;
+    if (!normalizedQuery) return true;
+    const assignedTruck = getAssignedTruckInfo(route.assignedTruck);
+    return (
+      route.name.toLowerCase().includes(normalizedQuery) ||
+      route.code.toLowerCase().includes(normalizedQuery) ||
+      route.assignedTruck?.toLowerCase().includes(normalizedQuery) ||
+      assignedTruck?.truckNumber.toLowerCase().includes(normalizedQuery) ||
+      assignedTruck?.driver.toLowerCase().includes(normalizedQuery)
+    );
+  });
 
   const getAssignedTruckInfo = (truckId?: string) => {
     if (!truckId) return null;
@@ -41,7 +55,7 @@ export default function RouteListView({
   const getPointTypeIcon = (type: string) => {
     switch (type) {
       case "pickup": return <div className="w-2 h-2 rounded-full bg-green-500" />;
-      case "gcp": return <div className="w-2 h-2 rounded-full bg-amber-500" />;
+      case "gtp": return <div className="w-2 h-2 rounded-full bg-amber-500" />;
       case "dumping": return <div className="w-2 h-2 rounded-full bg-red-500" />;
       default: return <div className="w-2 h-2 rounded-full bg-gray-500" />;
     }
@@ -52,6 +66,15 @@ export default function RouteListView({
       {/* Route List */}
       <Card className="lg:col-span-1">
         <CardHeader className="pb-3">
+          <div className="relative mb-3">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search routes, trucks, drivers..."
+              className="pl-9 h-9"
+            />
+          </div>
           <div className="flex gap-1 mb-3">
             {(["all", "primary", "secondary"] as const).map((type) => (
               <Button
@@ -119,14 +142,14 @@ export default function RouteListView({
                       >
                         {route.type}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">{route.points.length} points</span>
+                      <span className="text-xs text-muted-foreground">{route.totalPickupPoints || route.total_pickup_points || 0} points</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
-                        <Route className="h-3 w-3" /> {route.distance}
+                        <Route className="h-3 w-3" /> {route.distance || `${route.estimated_distance || route.estimatedDistance || 0} km`}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {route.estimatedTime}
+                        <Clock className="h-3 w-3" /> {route.estimated_time || route.estimatedTime || 0} min
                       </span>
                     </div>
                     {truck && (
@@ -181,29 +204,30 @@ export default function RouteListView({
             <CardContent>
               <div className="grid md:grid-cols-3 gap-4 mb-6">
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{selectedRoute.distance}</p>
+                  <p className="text-2xl font-bold text-primary">{selectedRoute.distance || `${selectedRoute.estimated_distance || selectedRoute.estimatedDistance || 0} km`}</p>
                   <p className="text-sm text-muted-foreground">Total Distance</p>
                 </div>
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{selectedRoute.estimatedTime}</p>
+                  <p className="text-2xl font-bold text-primary">{selectedRoute.estimated_time || selectedRoute.estimatedTime || 0} min</p>
                   <p className="text-sm text-muted-foreground">Estimated Time</p>
                 </div>
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{selectedRoute.points.length}</p>
+                  <p className="text-2xl font-bold text-primary">{selectedRoute.totalPickupPoints || selectedRoute.total_pickup_points || 0}</p>
                   <p className="text-sm text-muted-foreground">Total Points</p>
                 </div>
               </div>
 
-              {/* Route Flow Visualization */}
-              <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-                <h4 className="font-semibold mb-3 text-sm">Route Flow</h4>
-                <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                  {selectedRoute.points.map((point, index) => (
+              {/* Route Flow Visualization - Only show if points exist */}
+              {selectedRoute.points && selectedRoute.points.length > 0 && (
+                <div className="mb-6 p-4 bg-muted/30 rounded-lg">
+                  <h4 className="font-semibold mb-3 text-sm">Route Flow</h4>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    {selectedRoute.points.map((point, index) => (
                     <div key={point.id} className="flex items-center gap-2">
                       <div className="flex flex-col items-center min-w-fit">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
                           point.type === "pickup" ? "bg-green-500" :
-                          point.type === "gcp" ? "bg-amber-500" :
+                          point.type === "gtp" ? "bg-amber-500" :
                           "bg-red-500"
                         }`}>
                           {point.order}
@@ -221,15 +245,18 @@ export default function RouteListView({
                   ))}
                 </div>
               </div>
+              )}
 
-              {/* Detailed Points List */}
-              <h4 className="font-semibold mb-3">Route Points Detail</h4>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {selectedRoute.points.map((point, index) => (
+              {/* Detailed Points List - Only show if points exist */}
+              {selectedRoute.points && selectedRoute.points.length > 0 && (
+                <>
+                  <h4 className="font-semibold mb-3">Route Points Detail</h4>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {selectedRoute.points.map((point, index) => (
                   <div key={point.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                       point.type === "pickup" ? "bg-green-500 text-white" :
-                      point.type === "gcp" ? "bg-amber-500 text-white" :
+                      point.type === "gtp" ? "bg-amber-500 text-white" :
                       "bg-red-500 text-white"
                     }`}>
                       {point.order}
@@ -255,6 +282,8 @@ export default function RouteListView({
                   </div>
                 ))}
               </div>
+            </>
+            )}
 
               {selectedRoute.assignedTruck && (
                 <div className="mt-6 p-4 bg-primary/10 rounded-lg">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,21 +9,53 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockRoutes, mockPickupPoints, mockZones, mockWards, mockTrucks, Route, PickupPoint } from '@/data/masterData';
-import { Plus, Search, Edit, Trash2, MapPin, Route as RouteIcon, Clock, Download } from 'lucide-react';
+import { useRoutes, usePickupPoints, useZones, useZoneWards, useTrucks } from '@/hooks/useDataQueries';
+import { Route, PickupPoint } from '@/data/masterData';
+import { Plus, Search, Edit, Trash2, MapPin, Route as RouteIcon, Clock, Download, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 export default function MasterRoutesPickups() {
   const { toast } = useToast();
-  const [routes, setRoutes] = useState<Route[]>(mockRoutes);
-  const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>(mockPickupPoints);
+  const { data: routesData = [], isLoading: isLoadingRoutes } = useRoutes();
+  const { data: pickupPointsData = [], isLoading: isLoadingPickupPoints } = usePickupPoints();
+  const { data: zonesData = [], isLoading: isLoadingZones } = useZones();
+  const { data: wardsData = [], isLoading: isLoadingWards } = useZoneWards();
+  const { data: trucksData = [], isLoading: isLoadingTrucks } = useTrucks();
+  
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRouteDialogOpen, setIsRouteDialogOpen] = useState(false);
   const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [editingPickup, setEditingPickup] = useState<PickupPoint | null>(null);
+
+  useEffect(() => {
+    setRoutes(routesData as Route[]);
+  }, [routesData]);
+
+  useEffect(() => {
+    setPickupPoints(pickupPointsData as PickupPoint[]);
+  }, [pickupPointsData]);
+  
+  const [zones, setZones] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [trucks, setTrucks] = useState([]);
   
   const [routeForm, setRouteForm] = useState<Partial<Route>>({ name: '', code: '', type: 'primary', wardId: '', zoneId: '', assignedTruckId: '', totalPickupPoints: 0, estimatedDistance: 0, estimatedTime: 0, status: 'active' });
   const [pickupForm, setPickupForm] = useState<Partial<PickupPoint>>({ pointCode: '', name: '', address: '', latitude: 0, longitude: 0, routeId: '', wardId: '', wasteType: 'mixed', expectedPickupTime: '', geofenceRadius: 30, status: 'active' });
+
+  useEffect(() => {
+    setZones(zonesData);
+  }, [zonesData]);
+
+  useEffect(() => {
+    setWards(wardsData);
+  }, [wardsData]);
+
+  useEffect(() => {
+    setTrucks(trucksData as any);
+  }, [trucksData]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -44,10 +76,10 @@ export default function MasterRoutesPickups() {
     return <Badge className={colors[type] || ''}>{type}</Badge>;
   };
 
-  const getZoneName = (zoneId: string) => mockZones.find(z => z.id === zoneId)?.name || 'Unknown';
-  const getWardName = (wardId: string) => mockWards.find(w => w.id === wardId)?.name || 'Unknown';
+  const getZoneName = (zoneId: string) => zones.find(z => z.id === zoneId)?.name || 'Unknown';
+  const getWardName = (wardId: string) => wards.find(w => w.id === wardId)?.name || 'Unknown';
   const getRouteName = (routeId: string) => routes.find(r => r.id === routeId)?.name || 'Unknown';
-  const getTruckReg = (truckId?: string) => truckId ? mockTrucks.find(t => t.id === truckId)?.registrationNumber || 'Unknown' : 'Not Assigned';
+  const getTruckReg = (truckId?: string) => truckId ? trucks.find(t => t.id === truckId)?.registrationNumber || 'Unknown' : 'Not Assigned';
 
   // Route handlers
   const handleRouteSubmit = () => {
@@ -92,12 +124,12 @@ export default function MasterRoutesPickups() {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Routes & Pickup Points</h1>
-          <p className="text-muted-foreground">Manage collection routes and pickup locations</p>
-        </div>
-      </div>
+      <PageHeader
+        category="Master Data"
+        title="Routes & Pickup Points"
+        description="Manage collection routes and pickup locations across zones"
+        icon={RouteIcon}
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-5">
@@ -161,7 +193,7 @@ export default function MasterRoutesPickups() {
                       <Label>Zone</Label>
                       <Select value={routeForm.zoneId} onValueChange={(v) => setRouteForm({ ...routeForm, zoneId: v })}>
                         <SelectTrigger><SelectValue placeholder="Select zone" /></SelectTrigger>
-                        <SelectContent>{mockZones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}</SelectContent>
+                        <SelectContent>{zones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                   </div>
@@ -170,14 +202,14 @@ export default function MasterRoutesPickups() {
                       <Label>Ward</Label>
                       <Select value={routeForm.wardId} onValueChange={(v) => setRouteForm({ ...routeForm, wardId: v })}>
                         <SelectTrigger><SelectValue placeholder="Select ward" /></SelectTrigger>
-                        <SelectContent>{mockWards.filter(w => !routeForm.zoneId || w.zoneId === routeForm.zoneId).map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                        <SelectContent>{wards.filter(w => !routeForm.zoneId || w.zoneId === routeForm.zoneId).map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Assigned Truck</Label>
                       <Select value={routeForm.assignedTruckId || 'none'} onValueChange={(v) => setRouteForm({ ...routeForm, assignedTruckId: v === 'none' ? '' : v })}>
                         <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
-                        <SelectContent><SelectItem value="none">Not Assigned</SelectItem>{mockTrucks.filter(t => t.status === 'active').map(t => <SelectItem key={t.id} value={t.id}>{t.registrationNumber}</SelectItem>)}</SelectContent>
+                        <SelectContent><SelectItem value="none">Not Assigned</SelectItem>{trucks.filter(t => t.status === 'active').map(t => <SelectItem key={t.id} value={t.id}>{t.registrationNumber}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                   </div>

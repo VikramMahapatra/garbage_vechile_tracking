@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef, useMemo } from "react";
-import { GoogleMap, LoadScript, Marker, InfoWindow } from "@react-google-maps/api";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
 import { Card } from "@/components/ui/card";
-import { Navigation, Filter, X, Maximize2, Minimize2 } from "lucide-react";
-import { trucks as fleetTrucks, GOOGLE_MAPS_API_KEY, KHARADI_CENTER } from "@/data/fleetData";
-import { mockZones, mockWards, mockVendors, mockTrucks } from "@/data/masterData";
+import { Navigation, Filter, X, Maximize2, Minimize2, AlertCircle, Loader2 } from "lucide-react";
+import { KHARADI_CENTER } from "@/data/fleetData";
+import { useLiveTrucks, useZones, useZoneWards, useVendors } from "@/hooks/useDataQueries";
 import { createTruckMarkerIcon } from "./TruckIcon";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -14,33 +14,55 @@ interface MapViewProps {
   allowFullscreen?: boolean;
 }
 
-// Transform fleet data for map display with additional metadata
-const trucks = fleetTrucks.map(t => {
-  // Find truck master data to get vendor and type info
-  const truckMaster = mockTrucks.find(mt => mt.registrationNumber.replace(/\s/g, '-') === t.truckNumber.replace(/\s/g, '-'));
-  
-  return {
-    id: t.id,
-    position: t.position,
-    status: t.status as "moving" | "idle" | "dumping" | "offline" | "breakdown",
-    driver: t.driver,
-    route: t.route,
-    routeType: t.truckType as "primary" | "secondary",
-    speed: t.speed,
-    vendorId: t.vendorId || truckMaster?.vendorId,
-    vehicleType: truckMaster?.type || "compactor",
-    // Mock zone/ward assignment based on route
-    zoneId: "ZN003", // Default to East Zone (Kharadi area)
-    wardId: "WD001", // Default to Kharadi ward
-  };
-});
-
-const containerStyle = {
-  width: '100%',
-  height: '100%'
-};
-
 const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: MapViewProps) => {
+  const { data: liveTrucksData = [] } = useLiveTrucks();
+  const { data: zonesData = [] } = useZones();
+  const { data: wardsData = [] } = useZoneWards();
+  const { data: vendorsData = [] } = useVendors();
+
+  const [zones, setZones] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [liveTrucks, setLiveTrucks] = useState([]);
+
+  useEffect(() => {
+    setLiveTrucks(liveTrucksData);
+  }, [liveTrucksData]);
+
+  useEffect(() => {
+    setZones(zonesData);
+  }, [zonesData]);
+
+  useEffect(() => {
+    setWards(wardsData);
+  }, [wardsData]);
+
+  useEffect(() => {
+    setVendors(vendorsData);
+  }, [vendorsData]);
+
+  // Transform fleet data for map display
+  const trucks = useMemo(() => {
+    return liveTrucks.map(t => ({
+      id: t.id,
+      position: t.position,
+      status: t.status as "moving" | "idle" | "dumping" | "offline" | "breakdown",
+      driver: t.driver,
+      route: t.route,
+      routeType: t.routeType as "primary" | "secondary",
+      speed: t.speed,
+      vendorId: t.vendorId,
+      vehicleType: t.vehicleType || "compactor",
+      zoneId: t.zoneId || "ZN003",
+      wardId: t.wardId || "WD001",
+    }));
+  }, [liveTrucks]);
+
+  const containerStyle = {
+    width: '100%',
+    height: '100%'
+  };
+
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -57,9 +79,9 @@ const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: 
 
   // Filter wards based on selected zone
   const filteredWards = useMemo(() => {
-    if (selectedZone === "all") return mockWards;
-    return mockWards.filter(w => w.zoneId === selectedZone);
-  }, [selectedZone]);
+    if (selectedZone === "all") return wards;
+    return wards.filter(w => w.zoneId === selectedZone);
+  }, [selectedZone, wards]);
 
   // Apply filters to trucks
   const filteredTrucks = useMemo(() => {
@@ -135,7 +157,7 @@ const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Zones</SelectItem>
-              {mockZones.filter(z => z.status === 'active').map(zone => (
+              {zones.filter(z => z.status === 'active').map(zone => (
                 <SelectItem key={zone.id} value={zone.id}>{zone.name}</SelectItem>
               ))}
             </SelectContent>
@@ -171,7 +193,7 @@ const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Vendors</SelectItem>
-              {mockVendors.filter(v => v.status === 'active').map(vendor => (
+              {vendors.filter(v => v.status === 'active').map(vendor => (
                 <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
               ))}
             </SelectContent>
@@ -181,21 +203,28 @@ const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: 
 
       {/* Map Container */}
       <div className="flex-1 relative">
-        <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
-          <GoogleMap
-            mapContainerStyle={containerStyle}
-            center={KHARADI_CENTER}
-            zoom={15}
-            onClick={handleMapClick}
-            onLoad={onMapLoad}
-            options={{
-              styles: [
-                { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
-              ],
-              streetViewControl: false,
-              mapTypeControl: true,
-            }}
-          >
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={KHARADI_CENTER}
+          zoom={15}
+          onClick={handleMapClick}
+          onLoad={onMapLoad}
+          options={{
+            styles: [
+              { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
+            ],
+            streetViewControl: false,
+            mapTypeControl: true,
+            zoomControl: true,
+            zoomControlOptions: {
+              position: google.maps.ControlPosition.TOP_RIGHT,
+            },
+            fullscreenControl: true,
+            fullscreenControlOptions: {
+              position: google.maps.ControlPosition.TOP_LEFT,
+            },
+          }}
+        >
             {/* Truck Markers */}
             {isMapLoaded && filteredTrucks.map((truck) => (
               <Marker
@@ -203,9 +232,9 @@ const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: 
                 position={truck.position}
                 onClick={() => setSelectedMarker(truck.id)}
                 icon={{
-                  url: createTruckMarkerIcon(truck.status as any, truck.routeType as any),
-                  scaledSize: new google.maps.Size(48, 32),
-                  anchor: new google.maps.Point(24, 28),
+                  url: createTruckMarkerIcon(truck.status as any, truck.routeType as any, truck.bearing || 0, truck.speed || 0),
+                  scaledSize: new google.maps.Size(56, 48),
+                  anchor: new google.maps.Point(28, 40),
                 }}
               >
                 {selectedMarker === truck.id && (
@@ -232,8 +261,7 @@ const MapView = ({ selectedTruck: propSelectedTruck, allowFullscreen = false }: 
                 )}
               </Marker>
             ))}
-          </GoogleMap>
-        </LoadScript>
+        </GoogleMap>
 
         {/* Status Overlay */}
         <div className="absolute top-3 right-3 bg-background/95 backdrop-blur-sm rounded-lg border border-border shadow-lg p-3">

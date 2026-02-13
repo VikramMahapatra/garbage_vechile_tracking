@@ -1,12 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  mockZones, 
-  mockWards, 
-  mockVendors, 
-  mockTrucks, 
-  mockRoutes,
-  mockDrivers 
-} from "@/data/masterData";
+import { useZones, useZoneWards, useVendors, useTrucks, useRoutes, useDrivers } from "@/hooks/useDataQueries";
 import { 
   MapPin, 
   Building2, 
@@ -16,7 +9,8 @@ import {
   UserCheck,
   TrendingUp,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react";
 import {
   ChartContainer,
@@ -28,32 +22,47 @@ import { useNavigate } from "react-router-dom";
 
 const OperationalStats = () => {
   const navigate = useNavigate();
+  const { data: zonesData = [] } = useZones();
+  const { data: wardsData = [] } = useZoneWards();
+  const { data: vendorsData = [] } = useVendors();
+  const { data: trucksData = [] } = useTrucks();
+  const { data: routesData = [] } = useRoutes();
+  const { data: driversData = [] } = useDrivers();
+
+  // Use data directly instead of duplicating in state
+  const zones = zonesData as any[];
+  const wards = wardsData as any[];
+  const vendors = vendorsData as any[];
+  const trucks = trucksData as any[];
+  const routes = routesData as any[];
+  const drivers = driversData as any[];
+
   // Calculate stats
-  const activeZones = mockZones.filter(z => z.status === 'active').length;
-  const activeWards = mockWards.filter(w => w.status === 'active').length;
-  const activeVendors = mockVendors.filter(v => v.status === 'active').length;
-  const activeTrucks = mockTrucks.filter(t => t.status === 'active').length;
-  const maintenanceTrucks = mockTrucks.filter(t => t.status === 'maintenance').length;
-  const activeDrivers = mockDrivers.filter(d => d.status === 'active').length;
-  const activeRoutes = mockRoutes.filter(r => r.status === 'active').length;
+  const activeZones = zones.filter(z => z.status === 'active').length;
+  const activeWards = wards.filter(w => w.status === 'active').length;
+  const activeVendors = vendors.filter(v => v.status === 'active').length;
+  const activeTrucks = trucks.filter(t => t.status === 'active').length;
+  const maintenanceTrucks = trucks.filter(t => t.status === 'maintenance').length;
+  const activeDrivers = drivers.filter(d => d.status === 'active').length;
+  const activeRoutes = routes.filter(r => r.status === 'active').length;
 
   // Truck type distribution
   const truckTypeData = [
-    { name: 'Compactor', value: mockTrucks.filter(t => t.type === 'compactor').length, fill: 'hsl(var(--chart-1))' },
-    { name: 'Mini-truck', value: mockTrucks.filter(t => t.type === 'mini-truck').length, fill: 'hsl(var(--chart-2))' },
-    { name: 'Dumper', value: mockTrucks.filter(t => t.type === 'dumper').length, fill: 'hsl(var(--chart-3))' },
-    { name: 'Open-truck', value: mockTrucks.filter(t => t.type === 'open-truck').length, fill: 'hsl(var(--chart-4))' },
+    { name: 'Compactor', value: trucks.filter(t => t.type === 'compactor').length, fill: 'hsl(var(--chart-1))' },
+    { name: 'Mini-truck', value: trucks.filter(t => t.type === 'mini-truck').length, fill: 'hsl(var(--chart-2))' },
+    { name: 'Dumper', value: trucks.filter(t => t.type === 'dumper').length, fill: 'hsl(var(--chart-3))' },
+    { name: 'Open-truck', value: trucks.filter(t => t.type === 'open-truck').length, fill: 'hsl(var(--chart-4))' },
   ];
 
   // Vendor truck distribution
-  const vendorData = mockVendors.map(v => ({
-    name: v.name.split(' ')[0],
-    trucks: v.trucksOwned.length,
-    spare: v.spareTrucks.length,
+  const vendorData = vendors.map(v => ({
+    name: v.companyName?.split(' ')[0] || v.name?.split(' ')[0] || 'Unknown',
+    trucks: trucks.filter(t => t.vendorId === v.id).length,
+    spare: trucks.filter(t => t.vendorId === v.id && t.isSpare).length,
   }));
 
   // Zone ward distribution
-  const zoneData = mockZones.map(z => ({
+  const zoneData = zones.map(z => ({
     name: z.code,
     wards: z.totalWards,
   }));
@@ -69,31 +78,31 @@ const OperationalStats = () => {
   };
 
   const stats = [
-    { label: "Zones", value: activeZones, total: mockZones.length, icon: MapPin, color: "text-chart-1", bgColor: "bg-chart-1/10", route: "/master/zones-wards" },
-    { label: "Wards", value: activeWards, total: mockWards.length, icon: Building2, color: "text-chart-2", bgColor: "bg-chart-2/10", route: "/master/zones-wards" },
-    { label: "Vendors", value: activeVendors, total: mockVendors.length, icon: Users, color: "text-chart-3", bgColor: "bg-chart-3/10", route: "/master/vendors" },
-    { label: "Trucks", value: activeTrucks, total: mockTrucks.length, icon: Truck, color: "text-chart-4", bgColor: "bg-chart-4/10", route: "/master/trucks" },
-    { label: "Drivers", value: activeDrivers, total: mockDrivers.length, icon: UserCheck, color: "text-primary", bgColor: "bg-primary/10", route: "/master/drivers" },
-    { label: "Routes", value: activeRoutes, total: mockRoutes.length, icon: Route, color: "text-chart-5", bgColor: "bg-chart-5/10", route: "/master/routes-pickups" },
+    { label: "Zones", value: activeZones, total: zones.length, icon: MapPin, color: "text-chart-1", bgColor: "bg-chart-1/10", route: "/master/zones-wards" },
+    { label: "Wards", value: activeWards, total: wards.length, icon: Building2, color: "text-chart-2", bgColor: "bg-chart-2/10", route: "/master/zones-wards" },
+    { label: "Vendors", value: activeVendors, total: vendors.length, icon: Users, color: "text-chart-3", bgColor: "bg-chart-3/10", route: "/master/vendors" },
+    { label: "Trucks", value: activeTrucks, total: trucks.length, icon: Truck, color: "text-chart-4", bgColor: "bg-chart-4/10", route: "/master/trucks" },
+    { label: "Drivers", value: activeDrivers, total: drivers.length, icon: UserCheck, color: "text-primary", bgColor: "bg-primary/10", route: "/master/drivers" },
+    { label: "Routes", value: activeRoutes, total: routes.length, icon: Route, color: "text-chart-5", bgColor: "bg-chart-5/10", route: "/master/routes-pickups" },
   ];
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
           Operational Overview
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
               <div 
                 key={index} 
-                className={`${stat.bgColor} rounded-lg p-3 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity group`}
+                className={`${stat.bgColor} rounded-lg p-2.5 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity group`}
                 onClick={() => navigate(stat.route)}
               >
                 <Icon className={`h-4 w-4 ${stat.color}`} />
@@ -120,7 +129,7 @@ const OperationalStats = () => {
         )}
 
         {/* Charts Row */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {/* Truck Type Distribution */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Fleet by Type</p>
@@ -180,10 +189,10 @@ const OperationalStats = () => {
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Zone Coverage</p>
           <div className="flex gap-2">
-            {mockZones.slice(0, 5).map((zone) => (
+            {zones.slice(0, 5).map((zone) => (
               <div 
                 key={zone.id} 
-                className="flex-1 text-center p-2 rounded-lg bg-muted/50"
+                className="flex-1 text-center p-2.5 rounded-lg bg-muted/50"
               >
                 <p className="text-xs font-semibold">{zone.code}</p>
                 <p className="text-lg font-bold text-primary">{zone.totalWards}</p>

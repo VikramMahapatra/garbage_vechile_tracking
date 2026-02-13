@@ -36,23 +36,23 @@ export type {
   GPSDevice 
 } from './trucks';
 
-// Routes, Pickup Points, GCPs, Dumping Sites
+// Routes, Pickup Points, GTPs, Dumping Sites
 export { 
   routes, 
   pickupPoints, 
-  gcpLocations, 
+  gtpLocations, 
   finalDumpingSites,
   getRoutesByZone,
   getRoutesByWard,
   getRouteById,
   getPickupPointsByRoute,
   getPickupPointsByWard,
-  getGCPByZone,
+  getGTPByZone,
   generateHistoricalPath,
   GOOGLE_MAPS_API_KEY,
   KHARADI_CENTER
 } from './routes';
-export type { Route, RoutePoint, PickupPoint, GCPLocation, FinalDumpingSite, HistoricalPath } from './routes';
+export type { Route, RoutePoint, PickupPoint, GTPLocation, FinalDumpingSite, HistoricalPath } from './routes';
 
 // Tickets and Escalation
 export { 
@@ -106,7 +106,7 @@ export const getDataSummary = () => {
   const { vendors } = require('./vendors');
   const { drivers } = require('./drivers');
   const { trucksMaster, trucksLive } = require('./trucks');
-  const { routes, pickupPoints, gcpLocations } = require('./routes');
+  const { routes, pickupPoints, gtpLocations } = require('./routes');
   
   return {
     zones: {
@@ -149,6 +149,6 @@ export const getDataSummary = () => {
       total: pickupPoints.length,
       active: pickupPoints.filter((p: any) => p.status === 'active').length
     },
-    gcpLocations: gcpLocations.length
+    gtpLocations: gtpLocations.length
   };
 };

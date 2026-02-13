@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { 
+import {
   Twitter, 
   Bell, 
   Map, 
@@ -21,7 +22,8 @@ import {
   MessageCircle,
   AlertTriangle,
   Plus,
-  Trash2
+  Trash2,
+  Settings as SettingsIcon
 } from 'lucide-react';
 
 export default function Settings() {
@@ -210,10 +212,12 @@ Municipal Fleet Management`);
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">System Settings</h1>
-        <p className="text-muted-foreground mt-1">Configure system preferences and parameters</p>
-      </div>
+      <PageHeader
+        category="Administration"
+        title="System Settings"
+        description="Configure system preferences and parameters"
+        icon={SettingsIcon}
+      />
 
       <Tabs defaultValue="twitter" className="space-y-6">
         <TabsList className="bg-muted/50">

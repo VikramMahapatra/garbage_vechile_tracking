@@ -7,7 +7,7 @@ from ..schemas import schemas
 
 router = APIRouter(prefix="/routes", tags=["routes"])
 
-@router.get("/", response_model=List[schemas.Route])
+@router.get("/")
 def get_routes(
     zone_id: str = None,
     ward_id: str = None,
@@ -21,7 +21,49 @@ def get_routes(
         query = query.filter(models.Route.ward_id == ward_id)
     
     routes = query.all()
-    return routes
+    
+    # Manually construct response with pickup points
+    result = []
+    for route in routes:
+        pickup_points = db.query(models.PickupPoint).filter(
+            models.PickupPoint.route_id == route.id
+        ).all()
+        
+        route_dict = {
+            "id": route.id,
+            "name": route.name,
+            "code": route.code,
+            "type": route.type,
+            "ward_id": route.ward_id,
+            "zone_id": route.zone_id,
+            "total_pickup_points": route.total_pickup_points,
+            "estimated_distance": route.estimated_distance,
+            "estimated_time": route.estimated_time,
+            "status": route.status,
+            "pickup_points": [
+                {
+                    "id": pp.id,
+                    "point_code": pp.point_code,
+                    "name": pp.name,
+                    "address": pp.address,
+                    "latitude": pp.latitude,
+                    "longitude": pp.longitude,
+                    "route_id": pp.route_id,
+                    "ward_id": pp.ward_id,
+                    "waste_type": pp.waste_type,
+                    "type": pp.type,
+                    "expected_pickup_time": pp.expected_pickup_time,
+                    "schedule": pp.schedule,
+                    "geofence_radius": pp.geofence_radius,
+                    "status": pp.status,
+                    "last_collection": pp.last_collection,
+                }
+                for pp in pickup_points
+            ]
+        }
+        result.append(route_dict)
+    
+    return result
 
 @router.post("/", response_model=schemas.Route)
 def create_route(route: schemas.RouteCreate, db: Session = Depends(get_db)):

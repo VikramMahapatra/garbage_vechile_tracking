@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,27 +28,123 @@ import {
 } from "@/components/ui/pagination";
 import { ArrowLeft, Search, Download, CheckCircle2, Clock, MapPin, Truck, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { mockZones, mockWards, mockVendors } from "@/data/masterData";
+import { useZones, useZoneWards, useVendors, useRoutes, useLiveTrucks } from "@/hooks/useDataQueries";
+import { PageHeader } from "@/components/PageHeader";
 
 const ITEMS_PER_PAGE = 10;
 
-const tripsData = [
-  { id: "TRP-001", truck: "TRK-001", driver: "Rajesh Sharma", route: "Kharadi Route 1", startTime: "06:00", endTime: "09:45", pickups: 24, status: "completed", duration: "3h 45m", zone: "North Zone", ward: "Aundh", vendor: "Mahesh Enterprises", routeType: "primary" },
-  { id: "TRP-002", truck: "TRK-002", driver: "Ramesh Kumar", route: "Viman Nagar Route", startTime: "06:15", endTime: "10:00", pickups: 18, status: "completed", duration: "3h 45m", zone: "East Zone", ward: "Viman Nagar", vendor: "Mahesh Enterprises", routeType: "primary" },
-  { id: "TRP-003", truck: "TRK-003", driver: "Santosh Kulkarni", route: "Hadapsar Route", startTime: "06:30", endTime: "10:30", pickups: 32, status: "completed", duration: "4h", zone: "South Zone", ward: "Hadapsar", vendor: "Green Transport Co", routeType: "primary" },
-  { id: "TRP-004", truck: "TRK-004", driver: "Suresh Patil", route: "Hospital Waste Route", startTime: "05:45", endTime: "08:15", pickups: 12, status: "completed", duration: "2h 30m", zone: "West Zone", ward: "Kothrud", vendor: "City Waste Solutions", routeType: "secondary" },
-  { id: "TRP-005", truck: "TRK-005", driver: "Amit Deshmukh", route: "Kharadi Route 2", startTime: "07:00", endTime: "11:00", pickups: 28, status: "completed", duration: "4h", zone: "East Zone", ward: "Kharadi", vendor: "Mahesh Enterprises", routeType: "primary" },
-  { id: "TRP-006", truck: "TRK-006", driver: "Dinesh Pawar", route: "Magarpatta Route", startTime: "06:00", endTime: "09:30", pickups: 22, status: "completed", duration: "3h 30m", zone: "South Zone", ward: "Hadapsar", vendor: "Green Transport Co", routeType: "primary" },
-  { id: "TRP-007", truck: "TRK-007", driver: "Mahesh Jadhav", route: "Industrial Route", startTime: "08:00", endTime: "12:00", pickups: 15, status: "completed", duration: "4h", zone: "West Zone", ward: "Warje", vendor: "City Waste Solutions", routeType: "secondary" },
-  { id: "TRP-008", truck: "TRK-008", driver: "Pradeep Raut", route: "Commercial Route", startTime: "06:45", endTime: "10:15", pickups: 20, status: "in_progress", duration: "—", zone: "Central Zone", ward: "Shivaji Nagar", vendor: "City Waste Solutions", routeType: "primary" },
-  { id: "TRP-009", truck: "TRK-009", driver: "Anil Gaikwad", route: "Residential Route", startTime: "05:30", endTime: "09:00", pickups: 35, status: "completed", duration: "3h 30m", zone: "North Zone", ward: "Baner", vendor: "Green Transport Co", routeType: "primary" },
-  { id: "TRP-010", truck: "TRK-010", driver: "Sanjay Bhosale", route: "IT Park Route", startTime: "07:30", endTime: "11:30", pickups: 16, status: "completed", duration: "4h", zone: "East Zone", ward: "Kharadi", vendor: "Mahesh Enterprises", routeType: "secondary" },
-  { id: "TRP-011", truck: "TRK-011", driver: "Prakash More", route: "Warehouse Route", startTime: "06:00", endTime: "09:45", pickups: 10, status: "completed", duration: "3h 45m", zone: "West Zone", ward: "Warje", vendor: "Green Transport Co", routeType: "secondary" },
-  { id: "TRP-012", truck: "TRK-012", driver: "Vishal Kadam", route: "Market Route", startTime: "05:00", endTime: "08:30", pickups: 42, status: "completed", duration: "3h 30m", zone: "Central Zone", ward: "Deccan", vendor: "City Waste Solutions", routeType: "primary" },
-];
+const parseTimeToMinutes = (time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
+};
+
+const formatDuration = (start: string, end: string) => {
+  const startMinutes = parseTimeToMinutes(start);
+  const endMinutes = parseTimeToMinutes(end);
+  if (startMinutes === null || endMinutes === null) return "—";
+  const normalizedEnd = endMinutes < startMinutes ? endMinutes + 24 * 60 : endMinutes;
+  const totalMinutes = Math.max(0, normalizedEnd - startMinutes);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes}m`;
+};
 
 const TripsCompleted = () => {
+  // Export filtered trips as CSV
+  const handleExport = () => {
+    if (!filteredTrips.length) return;
+    const headers = [
+      "Trip ID",
+      "Truck",
+      "Driver",
+      "Route",
+      "Zone",
+      "Block",
+      "Type",
+      "Start",
+      "End",
+      "Duration",
+      "Pickups",
+      "Status"
+    ];
+    const rows = filteredTrips.map(trip => [
+      trip.id,
+      trip.truck,
+      trip.driver,
+      trip.route,
+      trip.zone,
+      trip.ward,
+      trip.routeType,
+      trip.startTime,
+      trip.endTime,
+      trip.duration,
+      trip.pickups,
+      trip.status
+    ]);
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `trips_completed_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const navigate = useNavigate();
+  const { data: zonesData = [], isLoading: isLoadingZones } = useZones();
+  const { data: wardsData = [], isLoading: isLoadingWards } = useZoneWards();
+  const { data: vendorsData = [], isLoading: isLoadingVendors } = useVendors();
+  const { data: routesData = [], isLoading: isLoadingRoutes } = useRoutes();
+  const { data: trucksLiveData = [], isLoading: isLoadingTrucks } = useLiveTrucks();
+
+  const zones = zonesData;
+  const wards = wardsData;
+  const vendors = vendorsData;
+  const routes = routesData;
+  const trucksLive = trucksLiveData;
+
+  const isLoading = isLoadingZones || isLoadingWards || isLoadingVendors || isLoadingRoutes || isLoadingTrucks;
+
+  const zoneById = useMemo(() => new Map(zones.map((zone) => [zone.id, zone.name])), [zones]);
+  const wardById = useMemo(() => new Map(wards.map((ward) => [ward.id, ward.name])), [wards]);
+  const vendorById = useMemo(() => new Map(vendors.map((vendor) => [vendor.id, vendor.companyName])), [vendors]);
+  const routeById = useMemo(() => new Map(routes.map((route) => [route.id, route.name])), [routes]);
+  const tripsData = useMemo(() => {
+    if (isLoading) return [];
+    return trucksLive.map((truck, index) => {
+      const route = routeById.get(truck.routeId);
+      const routePoints = route?.points || [];
+      const startTime = routePoints[0]?.scheduledTime || "06:00";
+      const endTimeCandidate = routePoints[routePoints.length - 1]?.scheduledTime || "09:00";
+      const status = truck.status === "moving" || truck.status === "dumping" ? "in_progress" : "completed";
+      const endTime = status === "completed" ? endTimeCandidate : "—";
+      return {
+        id: `TRP-${String(index + 1).padStart(3, "0")}`,
+        truck: truck.truckNumber,
+        driver: truck.driver,
+        route: route?.name || truck.route,
+        startTime,
+        endTime,
+        pickups: route?.totalPickupPoints || 0,
+        status,
+        duration: status === "completed" ? formatDuration(startTime, endTimeCandidate) : "—",
+        zone: zoneById.get(truck.zoneId) || "Unknown",
+        ward: wardById.get(truck.wardId) || "Unknown",
+        vendor: vendorById.get(truck.vendorId) || "Unknown",
+        routeType: truck.truckType,
+      };
+    });
+  }, [zoneById, wardById, vendorById, routeById, trucksLive, isLoading]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [wardFilter, setWardFilter] = useState("all");
@@ -57,9 +153,9 @@ const TripsCompleted = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const uniqueZones = [...new Set(tripsData.map(d => d.zone))];
-  const uniqueWards = [...new Set(tripsData.filter(d => zoneFilter === "all" || d.zone === zoneFilter).map(d => d.ward))];
-  const uniqueVendors = [...new Set(tripsData.map(d => d.vendor))];
+  const uniqueZones = useMemo(() => [...new Set(tripsData.map(d => d.zone))], [tripsData]);
+  const uniqueWards = useMemo(() => [...new Set(tripsData.filter(d => zoneFilter === "all" || d.zone === zoneFilter).map(d => d.ward))], [tripsData, zoneFilter]);
+  const uniqueVendors = useMemo(() => [...new Set(tripsData.map(d => d.vendor))], [tripsData]);
 
   const filteredTrips = useMemo(() => {
     return tripsData.filter(trip => {
@@ -74,7 +170,7 @@ const TripsCompleted = () => {
       const matchesStatus = statusFilter === "all" || trip.status === statusFilter;
       return matchesSearch && matchesZone && matchesWard && matchesVendor && matchesRouteType && matchesStatus;
     });
-  }, [searchQuery, zoneFilter, wardFilter, vendorFilter, routeTypeFilter, statusFilter]);
+  }, [searchQuery, zoneFilter, wardFilter, vendorFilter, routeTypeFilter, statusFilter, tripsData]);
 
   const totalPages = Math.ceil(filteredTrips.length / ITEMS_PER_PAGE);
   const paginatedTrips = filteredTrips.slice(
@@ -97,39 +193,33 @@ const TripsCompleted = () => {
     }
   };
 
-  const handleExport = () => {
-    const csvContent = [
-      ["Trip ID", "Truck", "Driver", "Route", "Zone", "Block", "Vendor", "Type", "Start Time", "End Time", "Pickups", "Duration", "Status"].join(","),
-      ...filteredTrips.map(trip => 
-        [trip.id, trip.truck, trip.driver, trip.route, trip.zone, trip.ward, trip.vendor, trip.routeType, trip.startTime, trip.endTime, trip.pickups, trip.duration, trip.status].join(",")
-      )
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "trips_completed.csv";
-    a.click();
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <span className="text-lg text-muted-foreground">Loading trips data...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Trips Completed</h1>
-            <p className="text-muted-foreground text-sm">Today's trip completion status</p>
-          </div>
-        </div>
-        <Button variant="outline" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
-      </div>
-
+      <PageHeader
+        category="Operations"
+        title="Trips Completed"
+        description="Today's trip completion status and performance metrics"
+        icon={CheckCircle2}
+        actions={
+          <>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="p-4 border-l-4 border-l-success">
           <div className="flex items-center gap-3">

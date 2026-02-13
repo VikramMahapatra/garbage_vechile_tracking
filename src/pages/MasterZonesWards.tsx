@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,18 +9,38 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { mockZones, mockWards, Zone, Ward } from '@/data/masterData';
-import { Plus, Search, Edit, Trash2, MapPin, Users, Download } from 'lucide-react';
+import { useZones, useZoneWards } from '@/hooks/useDataQueries';
+import { Zone, Ward } from '@/data/masterData';
+import { Plus, Search, Edit, Trash2, MapPin, Users, Download, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 export default function MasterZonesWards() {
   const { toast } = useToast();
-  const [zones, setZones] = useState<Zone[]>(mockZones);
-  const [wards, setWards] = useState<Ward[]>(mockWards);
+  const { data: zonesData = [], isLoading: isLoadingZones } = useZones();
+  const [selectedZoneId, setSelectedZoneId] = useState<string>("");
+  const { data: wardsData = [], isLoading: isLoadingWards } = useZoneWards(selectedZoneId);
+  
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isZoneDialogOpen, setIsZoneDialogOpen] = useState(false);
   const [isWardDialogOpen, setIsWardDialogOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
   const [editingWard, setEditingWard] = useState<Ward | null>(null);
+
+  useEffect(() => {
+    setZones(zonesData);
+  }, [zonesData]);
+
+  useEffect(() => {
+    if (!selectedZoneId && zonesData.length > 0) {
+      setSelectedZoneId(zonesData[0].id);
+    }
+  }, [selectedZoneId, zonesData]);
+
+  useEffect(() => {
+    setWards(wardsData);
+  }, [wardsData]);
   
   const [zoneForm, setZoneForm] = useState<Partial<Zone>>({ name: '', code: '', description: '', supervisorName: '', supervisorPhone: '', totalWards: 0, status: 'active' });
   const [wardForm, setWardForm] = useState<Partial<Ward>>({ name: '', code: '', zoneId: '', population: 0, area: 0, totalPickupPoints: 0, status: 'active' });
@@ -88,12 +108,12 @@ export default function MasterZonesWards() {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Zones & Wards</h1>
-          <p className="text-muted-foreground">Manage geographical divisions</p>
-        </div>
-      </div>
+      <PageHeader
+        category="Master Data"
+        title="Zones & Wards"
+        description="Manage geographical divisions, zones, and ward boundaries"
+        icon={MapPin}
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">

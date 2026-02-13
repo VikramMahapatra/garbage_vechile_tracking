@@ -4,9 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, RotateCcw, FastForward, Rewind, MapPin, Clock, Navigation, Gauge, Route, Timer, Maximize2, Minimize2 } from "lucide-react";
-import { TruckData, generateHistoricalPath, KHARADI_CENTER, gcpLocations, pickupPoints } from "@/data/fleetData";
+import { Play, Pause, RotateCcw, FastForward, Rewind, MapPin, Clock, Navigation, Gauge, Route, Timer, Maximize2, Minimize2, CheckCircle2 } from "lucide-react";
+import { TruckData, generateHistoricalPath, KHARADI_CENTER, gtpLocations, pickupPoints } from "@/data/fleetData";
 import { useSmoothTruckAnimation } from "@/hooks/useSmoothTruckAnimation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useRoutes } from "@/hooks/useDataQueries";
 
 interface TruckJourneyReplayModalProps {
   truck: TruckData | null;
@@ -65,21 +67,44 @@ function createPickupMarker(visited: boolean, type: string): string {
 }
 
 // Generate a smoother, more realistic path through pickup points
-function generateRealisticPath(truckId: string, date: string): { lat: number; lng: number; timestamp: string }[] {
-  const routePickupPoints = pickupPoints.slice(0, 5); // First 5 pickup points for the route
-  const gcp = gcpLocations[0]; // End at first GCP
+function generateRealisticPath(
+  truckId: string,
+  date: string,
+  routePickupPoints: any[] = [],
+  gtp: { position: { lat: number; lng: number } } | null = null,
+  tripNumber: number = 1
+): { lat: number; lng: number; timestamp: string }[] {
+  // Use provided pickup points, or fallback to first 5 if empty
+  const actualPickupPoints = routePickupPoints.length > 0 ? routePickupPoints : pickupPoints.slice(0, 5);
+  const actualGtp = gtp || gtpLocations[0];
   
   const path: { lat: number; lng: number; timestamp: string }[] = [];
   
-  // Start position
-  const startPos = { lat: 18.5480, lng: 73.9380 };
-  path.push({ ...startPos, timestamp: `${date} 06:00:00` });
+  // Start position varies based on trip number
+  const startHour = 6 + (tripNumber - 1) * 4; // Trip 1: 6am, Trip 2: 10am, etc.
+  
+  // Get start position from first pickup point (handle both DB and mock formats)
+  let startPos = { lat: 18.5480, lng: 73.9380 };
+  if (actualPickupPoints.length > 0) {
+    const pp = actualPickupPoints[0];
+    startPos = {
+      lat: pp.position?.lat ?? pp.latitude ?? pp.lat ?? 18.5480,
+      lng: pp.position?.lng ?? pp.longitude ?? pp.lng ?? 73.9380,
+    };
+  }
+  
+  path.push({ ...startPos, timestamp: `${date} ${String(startHour).padStart(2, '0')}:00:00` });
   
   // Generate smooth path through each pickup point
+  const getPosition = (pp: any) => ({
+    lat: pp.position?.lat ?? pp.latitude ?? pp.lat ?? 0,
+    lng: pp.position?.lng ?? pp.longitude ?? pp.lng ?? 0,
+  });
+  
   const waypoints = [
     startPos,
-    ...routePickupPoints.map(p => p.position),
-    gcp.position
+    ...actualPickupPoints.slice(1).map(p => getPosition(p)),
+    actualGtp.position
   ];
   
   let totalMinutes = 0;
@@ -102,7 +127,7 @@ function generateRealisticPath(truckId: string, date: string): { lat: number; ln
       const lng = (1 - t) * (1 - t) * from.lng + 2 * (1 - t) * t * midLng + t * t * to.lng;
       
       totalMinutes += 2; // 2 minutes between points
-      const hour = Math.floor(totalMinutes / 60) + 6;
+      const hour = Math.floor(totalMinutes / 60) + startHour;
       const minute = totalMinutes % 60;
       
       path.push({
@@ -115,7 +140,7 @@ function generateRealisticPath(truckId: string, date: string): { lat: number; ln
     // Pause at pickup points (add duplicate point)
     if (i < waypoints.length - 2) {
       totalMinutes += 5; // 5 minute stop at each pickup
-      const hour = Math.floor(totalMinutes / 60) + 6;
+      const hour = Math.floor(totalMinutes / 60) + startHour;
       const minute = totalMinutes % 60;
       path.push({
         lat: to.lat,
@@ -137,21 +162,34 @@ export function TruckJourneyReplayModal({
   onClose, 
   selectedDate 
 }: TruckJourneyReplayModalProps) {
+  // Fetch routes data which includes actual database pickup points
+  const { data: routesData = [] } = useRoutes();
+  
   const [pathData, setPathData] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState("1");
+  const [displayDate, setDisplayDate] = useState(selectedDate);
 
-  // Route waypoints (pickup points + GCP)
+  // Route waypoints (pickup points + GTP)
   const routeWaypoints = useMemo(() => {
-    const points = pickupPoints.slice(0, 5).map(p => ({
+    if (!truck || !routesData.length) return [];
+    
+    // Find the truck's route in the API data
+    const route = (routesData as any[]).find(r => r.id === truck.routeId);
+    if (!route || !route.pickup_points) return [];
+    
+    // Use actual database pickup points
+    const points = route.pickup_points.map((p: any) => ({
       ...p,
+      position: { lat: p.latitude, lng: p.longitude },
       visited: false,
     }));
     return points;
-  }, []);
+  }, [truck, routesData]);
 
   // Use smooth animation hook
   const {
@@ -169,14 +207,31 @@ export function TruckJourneyReplayModal({
     () => setIsPlaying(false)
   );
 
-  // Load path data when truck or date changes
+  // Load path data when truck, date, or trip changes
   useEffect(() => {
-    if (truck && isOpen) {
-      const path = generateRealisticPath(truck.id, selectedDate);
+    if (truck && isOpen && routesData.length) {
+      // Find truck's route in API data
+      const route = (routesData as any[]).find(r => r.id === truck.routeId);
+      const routePickupPoints = route?.pickup_points || [];
+      
+      // Find GTP point in the route (type: 'gtp')
+      const gtpPoint = routePickupPoints.find((p: any) => p.type === 'gtp');
+      const gtp = gtpPoint ? {
+        position: { lat: gtpPoint.latitude, lng: gtpPoint.longitude }
+      } : gtpLocations[0];
+      
+      const path = generateRealisticPath(
+        truck.id,
+        displayDate,
+        routePickupPoints,
+        gtp,
+        parseInt(selectedTrip)
+      );
       setPathData(path);
       setIsPlaying(false);
+      reset();
     }
-  }, [truck, selectedDate, isOpen]);
+  }, [truck, displayDate, selectedTrip, isOpen, routesData]);
 
   // Reset animation when path data changes
   useEffect(() => {
@@ -314,23 +369,58 @@ export function TruckJourneyReplayModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className={`${isExpanded ? 'max-w-[95vw] h-[95vh]' : 'max-w-5xl h-[85vh]'} flex flex-col overflow-hidden transition-all duration-300`}>
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-3">
-            <Navigation className="h-5 w-5 text-primary" />
-            Journey Replay - {truck.truckNumber}
-            <Badge variant="outline" className="capitalize ml-2">{truck.truckType}</Badge>
-            <Badge variant="secondary" className="ml-2">
-              {(progress * 100).toFixed(0)}% Complete
-            </Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="ml-auto"
-              onClick={() => setIsExpanded(!isExpanded)}
-              title={isExpanded ? "Minimize" : "Expand"}
-            >
-              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
-          </DialogTitle>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <Navigation className="h-5 w-5 text-primary" />
+              <DialogTitle>Journey Replay - {truck.truckNumber}</DialogTitle>
+              <Badge variant="outline" className="capitalize ml-2">{truck.truckType}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {(progress * 100).toFixed(0)}% Complete
+              </Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-auto"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? "Minimize" : "Expand"}
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+            </div>
+            
+            {/* Date and Trip Selection */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Date:</label>
+                <input
+                  type="date"
+                  value={displayDate}
+                  onChange={(e) => setDisplayDate(e.target.value)}
+                  className="px-3 py-1 text-sm border border-border rounded-md bg-background"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Trip:</label>
+                <Select value={selectedTrip} onValueChange={setSelectedTrip}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map((trip) => (
+                      <SelectItem key={trip} value={String(trip)}>
+                        Trip {trip}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="ml-auto text-sm text-muted-foreground">
+                <span>Route: {truck.route}</span>
+              </div>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="flex flex-col flex-1 min-h-0 gap-2">
@@ -378,22 +468,22 @@ export function TruckJourneyReplayModal({
                     />
                   )}
 
-                  {/* GCP End Marker */}
+                  {/* GTP End Marker */}
                   {pathData.length > 0 && (
                     <Marker
-                      position={gcpLocations[0].position}
+                      position={gtpLocations[0].position}
                       icon={{
                         url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                           <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="18" cy="18" r="16" fill="${isComplete ? '#22c55e' : '#6366f1'}" stroke="white" stroke-width="2"/>
                             <text x="18" y="15" text-anchor="middle" font-size="12">🏭</text>
-                            <text x="18" y="28" text-anchor="middle" font-size="6" fill="white" font-weight="bold">GCP</text>
+                            <text x="18" y="28" text-anchor="middle" font-size="6" fill="white" font-weight="bold">GTP</text>
                           </svg>
                         `)}`,
                         scaledSize: new window.google.maps.Size(36, 36),
                         anchor: new window.google.maps.Point(18, 18),
                       }}
-                      title={gcpLocations[0].name}
+                      title={gtpLocations[0].name}
                       zIndex={1}
                     />
                   )}
@@ -475,6 +565,38 @@ export function TruckJourneyReplayModal({
                 </>
               )}
             </GoogleMap>
+
+            {/* Pickup Points overlay - Left side */}
+            <div className="absolute top-3 left-3 bg-background/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-border max-w-[200px] max-h-[300px] overflow-y-auto">
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Pickup Points
+                </h3>
+                {routeWaypoints.map((point, idx) => {
+                  const isVisited = visitedWaypoints[idx];
+                  return (
+                    <div key={idx} className={`flex items-center gap-2 text-xs p-2 rounded border ${isVisited ? 'bg-green-500/10 border-green-500/30' : 'border-border'}`}>
+                      {isVisited ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                      ) : (
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <div className="font-medium">{point.name}</div>
+                        <div className="text-muted-foreground text-[10px]">{(point.position.lat).toFixed(4)}, {(point.position.lng).toFixed(4)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="pt-2 border-t border-border mt-2">
+                  <div className="flex items-center gap-2 text-xs p-2 rounded bg-yellow-500/10 border border-yellow-500/30">
+                    <MapPin className="h-3.5 w-3.5 text-yellow-600" />
+                    <span className="font-medium">GTP: {gtpLocations[0]?.name || 'GTP-001'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Stats overlay */}
             <div className="absolute top-3 right-3 bg-background/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-border min-w-[180px]">
@@ -559,6 +681,10 @@ export function TruckJourneyReplayModal({
                   <span className="font-medium">{truck.driver}</span>
                 </div>
                 <div>
+                  <span className="text-muted-foreground">Trip: </span>
+                  <span className="font-medium text-blue-600">#{selectedTrip} of 5</span>
+                </div>
+                <div>
                   <span className="text-muted-foreground">Route: </span>
                   <span className="font-medium">{truck.route}</span>
                 </div>
@@ -639,7 +765,7 @@ export function TruckJourneyReplayModal({
 
               {/* Status - Right side */}
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">{selectedDate}</span>
+                <span className="text-muted-foreground">{displayDate}</span>
                 <Badge variant={isComplete ? "default" : isPlaying ? "secondary" : "outline"} className="text-xs">
                   {isComplete ? "Completed" : isPlaying ? "Playing" : "Paused"}
                 </Badge>

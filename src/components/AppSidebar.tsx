@@ -15,7 +15,8 @@ import {
   Building2,
   Route,
   Wrench,
-  LogOut
+  LogOut,
+  ClipboardCheck
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,6 +47,7 @@ const menuItems = [
   { title: 'Alerts', url: '/alerts', icon: AlertTriangle },
   { title: 'Reports', url: '/reports', icon: FileText },
   { title: 'Analytics', url: '/analytics', icon: BarChart3 },
+  { title: 'GTC Checkpoint', url: '/gtc-checkpoint', icon: ClipboardCheck },
   { title: 'Twitter Mentions', url: '/twitter', icon: Twitter },
   { title: 'Tickets', url: '/tickets', icon: Ticket },
   { title: 'Users', url: '/users', icon: Users },
@@ -72,23 +74,23 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-border/40 p-4">
+      <SidebarHeader className="border-b border-emerald-200/60 bg-gradient-to-r from-emerald-50/80 via-background to-amber-50/60 p-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/15 to-secondary/20 ring-1 ring-primary/20 flex items-center justify-center">
             <Truck className="w-5 h-5 text-primary" />
           </div>
           {open && (
             <div className="flex flex-col">
-              <span className="font-semibold text-sm">Fleet Tracking</span>
-              <span className="text-xs text-muted-foreground">Municipal System</span>
+              <span className="font-semibold text-sm text-emerald-700">Swachh Seva</span>
+              <span className="text-xs text-emerald-600/80">Swachh Bharat Mission</span>
             </div>
           )}
         </div>
       </SidebarHeader>
       
-      <SidebarContent>
+      <SidebarContent className="bg-gradient-to-b from-emerald-50/40 via-background to-amber-50/30">
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.2em] text-emerald-700/70">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -97,10 +99,12 @@ export function AppSidebar() {
                     <NavLink 
                       to={item.url} 
                       end={item.url === '/'}
-                      className="flex items-center gap-3 hover:bg-muted/50 rounded-md"
-                      activeClassName="bg-muted text-primary font-medium"
+                      className="group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary"
+                      activeClassName="bg-gradient-to-r from-primary/15 via-secondary/15 to-transparent text-foreground shadow-sm ring-1 ring-primary/15 [&>span:first-child]:bg-primary/15 [&>span:first-child]:text-primary"
                     >
-                      <item.icon className="h-4 w-4" />
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground transition-all group-hover:bg-primary/15 group-hover:text-primary">
+                        <item.icon className="h-4 w-4" />
+                      </span>
                       <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -112,7 +116,7 @@ export function AppSidebar() {
         
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center gap-2">
+            <SidebarGroupLabel className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-emerald-700/70">
               <Database className="h-3 w-3" /> Master Entries
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -122,10 +126,12 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <NavLink 
                         to={item.url}
-                        className="flex items-center gap-3 hover:bg-muted/50 rounded-md"
-                        activeClassName="bg-muted text-primary font-medium"
+                        className="group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary"
+                        activeClassName="bg-gradient-to-r from-primary/15 via-secondary/15 to-transparent text-foreground shadow-sm ring-1 ring-primary/15 [&>span:first-child]:bg-primary/15 [&>span:first-child]:text-primary"
                       >
-                        <item.icon className="h-4 w-4" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground transition-all group-hover:bg-primary/15 group-hover:text-primary">
+                          <item.icon className="h-4 w-4" />
+                        </span>
                         <span>{item.title}</span>
                       </NavLink>
                     </SidebarMenuButton>
@@ -137,11 +143,11 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border/40 p-3">
+      <SidebarFooter className="border-t border-emerald-200/60 bg-gradient-to-r from-emerald-50/70 via-background to-amber-50/50 p-3">
         {open ? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 px-2">
-              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/15 to-secondary/20 ring-1 ring-primary/20 flex items-center justify-center">
                 <User className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
@@ -155,7 +161,7 @@ export function AppSidebar() {
               variant="outline" 
               size="sm" 
               onClick={handleLogout}
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-2 bg-white/70 hover:bg-white"
             >
               <LogOut className="h-4 w-4" />
               Logout

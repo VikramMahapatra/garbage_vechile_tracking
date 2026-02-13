@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import json
 from ..database.database import get_db
 from ..models import models
 
@@ -115,3 +116,23 @@ def get_collection_efficiency(db: Session = Depends(get_db)):
         "efficiency_percentage": round(efficiency, 2),
         "total_active_trucks": len(trucks)
     }
+
+@router.get("/data")
+def get_reports_data(
+    report_type: str = Query(default=None, description="Optional comma-separated report types"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.ReportData)
+    if report_type:
+        types = [value.strip() for value in report_type.split(",") if value.strip()]
+        query = query.filter(models.ReportData.report_type.in_(types))
+
+    rows = query.all()
+    payload = {}
+    for row in rows:
+        try:
+            payload[row.report_type] = json.loads(row.payload)
+        except json.JSONDecodeError:
+            payload[row.report_type] = []
+
+    return payload
